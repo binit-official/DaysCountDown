@@ -1,41 +1,61 @@
-import { useState } from 'react';
-
-const PASSWORD = '45dayschallenge'; // Replace with your actual password
+import React, { useState } from 'react';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { useNavigate, Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const Login = () => {
-  const [input, setInput] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const auth = getAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (input === PASSWORD) {
-      localStorage.setItem('authenticated', 'true');
-      window.location.href = '/';
-    } else {
-      setError('Incorrect password. Please try again.');
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate('/');
+    } catch (err: any) {
+      setError('Failed to log in. Please check your email and password.');
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <form onSubmit={handleSubmit} className="bg-card p-8 rounded shadow-md w-full max-w-sm">
-        <h2 className="text-2xl font-bold mb-6 text-center">Enter Password</h2>
-        <input
-          type="password"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Password"
-          className="w-full p-3 rounded border border-gray-300 mb-4"
-          autoFocus
-        />
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        <button
-          type="submit"
-          className="w-full bg-primary text-white py-3 rounded hover:bg-primary-dark transition"
-        >
-          Submit
-        </button>
-      </form>
+      <Card className="w-full max-w-sm neon-border">
+        <CardHeader>
+          <CardTitle className="text-2xl text-center neon-text">Log In</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link to="/forgot-password" className="text-sm underline text-muted-foreground hover:text-primary">
+                  Forgot password?
+                </Link>
+              </div>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+            </div>
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+            <Button type="submit" className="w-full cyberpunk-button">Log In</Button>
+          </form>
+           <p className="mt-4 text-center text-sm text-muted-foreground">
+            Don't have an account?{' '}
+            <Link to="/signup" className="underline text-primary">
+              Sign Up
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 };
