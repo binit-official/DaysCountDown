@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext.tsx';
+import { useAuth } from '@/contexts/AuthContext';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { MotivationalQuote } from '@/components/MotivationalQuote';
 import { TaskManager, Task } from '@/components/TaskManager';
@@ -13,9 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, Zap } from 'lucide-react';
-
-const SHARED_TASKS_DOC = 'shared_tasks';
+import { AlertTriangle, Zap, Target, Clock, Flame } from 'lucide-react';
 
 const difficultyColors = {
   Easy: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -114,8 +112,28 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-4 py-4 md:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* Left Column: Mission Control */}
+          <div className="lg:col-span-3 space-y-6">
+            <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
+              <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} />
+            </Card>
+            <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
+              <AIPlanner onRoadmapChange={handleRoadmapUpdate} />
+            </Card>
+             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm border-accent/50">
+              <h3 className="text-lg font-black neon-text mb-4">HARSH TRUTH</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Active Missions</span><span className="font-black text-primary text-lg">{tasks.length}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Days Left</span><span className="font-black text-accent text-lg">{selectedTask ? Math.max(0, Math.floor((selectedTask.targetDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Extreme Tasks</span><span className="font-black text-red-500 text-lg animate-pulse">{tasks.filter(task => task.priority === 'extreme').length}</span></div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Center Column: Main Focus */}
+          <div className="lg:col-span-6 space-y-6">
             <Card className="p-4 md:p-8 neon-border bg-card/90 backdrop-blur-sm">
               {selectedTask ? (
                 <CountdownTimer key={selectedTask.id} targetDate={selectedTask.targetDate} startDate={selectedTask.startDate} title={selectedTask.title} />
@@ -127,17 +145,10 @@ const Index = () => {
               )}
             </Card>
             <MotivationalQuote />
-            <div className="grid md:grid-cols-2 gap-6">
-                <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
-                    <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} />
-                </Card>
-                <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
-                    <AIPlanner onRoadmapChange={handleRoadmapUpdate} />
-                </Card>
-            </div>
           </div>
-          
-          <div className="lg:col-span-1 space-y-6">
+
+          {/* Right Column: Daily Actions & Intel */}
+          <div className="lg:col-span-3 space-y-6">
             <DailyTaskCard roadmap={roadmap} />
             <AIAssistant currentRoadmap={roadmap} onRoadmapUpdate={handleAssistantUpdate} />
             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
