@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 // src/components/TaskManager.tsx
 
+=======
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 import { useState } from 'react';
 import { Plus, Edit3, Trash2, Target, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,11 +17,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
+<<<<<<< HEAD
 export interface SubTask {
   text: string;
   completed: boolean;
 }
 
+=======
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 export interface Task {
   id: string;
   title: string;
@@ -26,7 +32,10 @@ export interface Task {
   startDate: Date;
   category: string;
   priority: 'low' | 'medium' | 'high' | 'extreme';
+<<<<<<< HEAD
   subTasks: SubTask[];
+=======
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 }
 
 interface TaskManagerProps {
@@ -45,7 +54,11 @@ const priorityClasses = {
 
 const priorityLabels = {
   low: 'Low',
+<<<<<<< HEAD
   medium: 'Medium',
+=======
+  medium: 'Medium', 
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
   high: 'High',
   extreme: 'EXTREME'
 };
@@ -57,6 +70,7 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
     title: '',
     targetDate: '',
     category: '',
+<<<<<<< HEAD
     priority: 'high' as Task['priority'],
     subTasks: [] as SubTask[],
   });
@@ -81,25 +95,47 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
     if (!formData.title || !formData.targetDate) return;
 
     const taskData: Task = {
+=======
+    priority: 'high' as Task['priority']
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title || !formData.targetDate) return;
+    
+    const taskData = {
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
       id: editingTask?.id || Date.now().toString(),
       title: formData.title,
       targetDate: new Date(formData.targetDate),
       startDate: editingTask?.startDate || new Date(),
       category: formData.category || 'General',
+<<<<<<< HEAD
       priority: formData.priority,
       subTasks: formData.subTasks,
+=======
+      priority: formData.priority
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
     };
 
     const updatedTasks = editingTask
       ? tasks.map(task => (task.id === editingTask.id ? taskData : task))
       : [...tasks, taskData];
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
     onTasksChange(updatedTasks);
     if (!editingTask) {
         onSelectTask(taskData.id);
     }
 
+<<<<<<< HEAD
     setFormData({ title: '', targetDate: '', category: '', priority: 'high', subTasks: [] });
+=======
+    setFormData({ title: '', targetDate: '', category: '', priority: 'high' });
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
     setIsAddDialogOpen(false);
     setEditingTask(null);
   };
@@ -110,8 +146,12 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
       title: task.title,
       targetDate: task.targetDate.toISOString().split('T')[0],
       category: task.category,
+<<<<<<< HEAD
       priority: task.priority,
       subTasks: task.subTasks || [],
+=======
+      priority: task.priority
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
     });
     setIsAddDialogOpen(true);
   };
@@ -130,7 +170,11 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
     const now = new Date();
     const difference = targetDate.getTime() - now.getTime();
     const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
     if (days > 0) return `${days} days left`;
     if (days === 0) return 'Today!';
     return `${Math.abs(days)} days overdue`;
@@ -142,7 +186,11 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
         <h3 className="text-xl font-bold neon-text">Active Missions</h3>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
+<<<<<<< HEAD
             <Button className="cyberpunk-button" onClick={() => { setEditingTask(null); setFormData({ title: '', targetDate: '', category: '', priority: 'high', subTasks: [] }); }}>
+=======
+            <Button className="cyberpunk-button" onClick={() => { setEditingTask(null); setFormData({ title: '', targetDate: '', category: '', priority: 'high' }); }}>
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
               <Plus className="w-4 h-4 mr-2" /> New
             </Button>
           </DialogTrigger>
@@ -158,6 +206,7 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
                   <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="extreme">EXTREME</option>
                 </select>
               </div>
+<<<<<<< HEAD
 
               <div>
                 <Label className="text-foreground">Sub-tasks</Label>
@@ -177,6 +226,8 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
                 </Button>
               </div>
 
+=======
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
               <div className="flex space-x-2 pt-4"><Button type="submit" className="flex-1 cyberpunk-button">{editingTask ? 'Update' : 'Launch'}</Button><Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} className="neon-border">Cancel</Button></div>
             </form>
           </DialogContent>
@@ -184,7 +235,11 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
       </div>
       <div className="space-y-3">
         {tasks.map((task) => (
+<<<<<<< HEAD
           <Card
+=======
+          <Card 
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
             key={task.id}
             className={`p-3 cursor-pointer transition-all duration-300 ${selectedTaskId === task.id ? 'border-primary bg-primary/20 shadow-neon' : priorityClasses[task.priority]}`}
             onClick={() => onSelectTask(task.id)}

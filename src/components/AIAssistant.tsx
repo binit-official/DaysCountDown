@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 // src/components/AIAssistant.tsx
 
+=======
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,8 +13,11 @@ import { ScrollArea } from './ui/scroll-area';
 interface AIAssistantProps {
   currentRoadmap: any | null;
   onRoadmapUpdate: (updatedTasks: any[]) => void;
+<<<<<<< HEAD
   hasIncompleteTasks: boolean;
   allTasksCompleted: boolean;
+=======
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 }
 
 interface Message {
@@ -23,12 +29,19 @@ interface Message {
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
+<<<<<<< HEAD
 export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTasks, allTasksCompleted }: AIAssistantProps) => {
+=======
+export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate }: AIAssistantProps) => {
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+<<<<<<< HEAD
   const initialMessageSent = useRef(false); // Prevents re-triggering initial message
+=======
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -36,6 +49,7 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
     }
   }, [messages]);
 
+<<<<<<< HEAD
   useEffect(() => {
     const generateInitialMessage = async () => {
       if (!currentRoadmap || initialMessageSent.current) return;
@@ -83,6 +97,8 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
   }, [hasIncompleteTasks, allTasksCompleted, currentRoadmap]);
 
 
+=======
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
   const handleSendMessage = async () => {
     if (!input.trim() || !currentRoadmap) return;
 
@@ -98,7 +114,11 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
       You are a witty, no-nonsense, tough-love AI coach. Your goal is to keep the user on track with their mission.
       The user's goal is: "${currentRoadmap.goal}".
       Their current daily plan is: ${JSON.stringify(currentRoadmap.dailyTasks)}
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
       Conversation so far:
       ${conversationHistory}
 
@@ -123,17 +143,29 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
       const data = await response.json();
       const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!rawContent) throw new Error('Invalid API response.');
+<<<<<<< HEAD
 
       const parts = rawContent.split('---JSON---');
       const conversationalText = parts[0].trim();
       const jsonText = parts.length > 1 ? parts[1].replace(/```json\n?|```/g, '').trim() : null;
 
+=======
+      
+      const parts = rawContent.split('---JSON---');
+      const conversationalText = parts[0].trim();
+      const jsonText = parts.length > 1 ? parts[1].replace(/```json\n?|```/g, '').trim() : null;
+      
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
       const aiMessage: Message = { id: Date.now() + 1, sender: 'ai', text: conversationalText };
 
       if (jsonText) {
         aiMessage.proposedPlan = JSON.parse(jsonText);
       }
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
       setMessages(prev => [...prev, aiMessage]);
 
     } catch (err: any) {
@@ -143,12 +175,20 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
       setLoading(false);
     }
   };
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
   const handleAcceptPlan = (plan: any[]) => {
     onRoadmapUpdate(plan);
     setMessages(prev => prev.filter(msg => !msg.proposedPlan).concat({ id: Date.now(), sender: 'ai', text: "Plan updated. No more excuses." }));
   };
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
   const handleDeclinePlan = () => {
     setMessages(prev => prev.filter(msg => !msg.proposedPlan).concat({ id: Date.now(), sender: 'ai', text: "Fine. Stick to the original plan." }));
   };
@@ -185,11 +225,15 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
               {msg.sender === 'user' && <User className="w-5 h-5 text-primary flex-shrink-0 mt-1" />}
             </div>
           ))}
+<<<<<<< HEAD
           {loading && messages[messages.length - 1]?.sender === 'user' && (
             <div className="flex justify-start">
               <Bot className="w-5 h-5 text-secondary animate-spin" />
             </div>
           )}
+=======
+          {loading && <div className="flex justify-center"><Bot className="w-5 h-5 text-secondary animate-spin" /></div>}
+>>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
         </div>
       </ScrollArea>
       <div className="p-2 border-t border-secondary/20 flex-shrink-0">
