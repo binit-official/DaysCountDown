@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Radio } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface RoadmapProps {
@@ -18,7 +18,7 @@ const difficultyColors = {
   Easy: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   Medium: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
   Hard: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  Challenge: 'bg-red-500/20 text-red-300 border-red-500/30 animate-pulse',
+  Challenge: 'bg-red-500/20 text-red-300 border-red-500/30',
 };
 
 export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: RoadmapProps) => {
@@ -27,25 +27,19 @@ export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: Roadm
 
   useEffect(() => {
     if (currentDayRef.current && scrollViewportRef.current) {
-      // We have both the container and the target element.
-      // Now, we can calculate the exact scroll position.
       const viewport = scrollViewportRef.current;
       const element = currentDayRef.current;
-      
-      // Calculate the position of the current day's task relative to the scrollable container
       const offsetTop = element.offsetTop;
-      
-      // Scroll the container to bring the element to the top
       viewport.scrollTo({
-        top: offsetTop,
+        top: offsetTop - viewport.offsetTop,
         behavior: 'smooth',
       });
     }
-  }, [currentDay, roadmap]); // Rerun when the roadmap data is available or the day changes.
+  }, [currentDay, roadmap]);
 
   if (!roadmap || !roadmap.dailyTasks || roadmap.dailyTasks.length === 0) {
     return (
-      <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
+      <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm animate-fade-in-up">
         <h3 className="text-lg font-bold mb-4">Full Roadmap</h3>
         <p className="text-muted-foreground text-sm p-4 text-center">Generate a roadmap to see your full plan.</p>
       </Card>
@@ -55,42 +49,56 @@ export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: Roadm
   const startDate = roadmap.startDate ? (roadmap.startDate.toDate ? roadmap.startDate.toDate() : new Date(roadmap.startDate)) : new Date();
 
   return (
-    <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
-      <h3 className="text-lg font-bold mb-4">Full Roadmap</h3>
-      <ScrollArea className="h-64" viewportRef={scrollViewportRef}>
-        <ul className="space-y-3 pr-4">
-          {roadmap.dailyTasks.map((task: any) => {
-            const taskDate = new Date(startDate);
-            taskDate.setDate(startDate.getDate() + task.day - 1);
+    <Card className="p-4 md:p-6 neon-border bg-card/90 backdrop-blur-sm animate-fade-in-up">
+      <h3 className="text-2xl font-bold mb-6 text-center gradient-text">Your Mission Blueprint</h3>
+      <ScrollArea className="h-[400px] lg:h-[500px]" viewportRef={scrollViewportRef}>
+        <div className="relative pl-6">
+          {/* Vertical timeline bar */}
+          <div className="absolute left-0 top-0 h-full w-0.5 bg-border/50" />
+          <ul className="space-y-8">
+            {roadmap.dailyTasks.map((task: any) => {
+              const taskDate = new Date(startDate);
+              taskDate.setDate(startDate.getDate() + task.day - 1);
+              const isSelected = selectedDay === task.day;
 
-            return (
-              <li
-                key={task.day}
-                ref={task.day === currentDay ? currentDayRef : null}
-                className={`text-sm border-b border-muted/20 p-2 rounded-md relative cursor-pointer transition-colors ${selectedDay === task.day ? 'bg-primary/20' : 'hover:bg-primary/10'}`}
-                onClick={() => onSelectDay(task.day)}
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <strong className="text-primary">Day {task.day}</strong>
-                    <span className="text-xs text-muted-foreground ml-2">{format(taskDate, 'MMM d')}</span>
+              return (
+                <li
+                  key={task.day}
+                  ref={task.day === currentDay ? currentDayRef : null}
+                  className="relative pl-6 cursor-pointer group"
+                  onClick={() => onSelectDay(task.day)}
+                >
+                  {/* Timeline Dot */}
+                  <div className={`absolute -left-2.5 top-1 w-5 h-5 rounded-full border-4 transition-colors ${isSelected ? 'border-primary bg-primary/50' : 'border-card bg-border group-hover:bg-primary/50'}`} />
+
+                  <div className="transition-transform duration-300 group-hover:translate-x-2">
+                    <div className="flex items-baseline space-x-3">
+                      <strong className="text-primary text-lg">Day {task.day}</strong>
+                      <span className="text-sm font-semibold text-muted-foreground">{format(taskDate, 'MMMM d')}</span>
+                      <div className="flex-grow" />
+                      {task.day < currentDay && (
+                        task.completed ? (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5 text-red-500 animate-pulse" />
+                        )
+                      )}
+                      {task.day === currentDay && !task.completed && (
+                          <Radio className="w-5 h-5 text-primary animate-pulse" />
+                      )}
+                    </div>
+                    <p className="mt-1 text-base text-foreground/80">{task.task}</p>
+                    <div className="mt-2 text-left">
+                        <Badge variant="outline" className={`text-xs ${difficultyColors[task.difficulty as keyof typeof difficultyColors] || difficultyColors.Medium}`}>
+                          {task.difficulty}
+                        </Badge>
+                    </div>
                   </div>
-                  {task.day < currentDay && (
-                    task.completed ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <AlertTriangle className="w-5 h-5 text-red-500 animate-pulse" />
-                    )
-                  )}
-                </div>
-                <p className="mt-1 text-muted-foreground">{task.task}</p>
-                <Badge variant="outline" className={`absolute bottom-1 right-0 text-xs ${difficultyColors[task.difficulty as keyof typeof difficultyColors] || difficultyColors.Medium}`}>
-                  {task.difficulty}
-                </Badge>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </ScrollArea>
     </Card>
   );

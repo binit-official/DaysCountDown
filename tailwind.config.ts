@@ -1,3 +1,5 @@
+// tailwind.config.ts
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -52,35 +54,6 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
-				},
-				neon: {
-					cyan: 'hsl(var(--neon-cyan))',
-					pink: 'hsl(var(--neon-pink))',
-					green: 'hsl(var(--neon-green))',
-					blue: 'hsl(var(--electric-blue))'
-				}
-			},
-			backgroundImage: {
-				'gradient-primary': 'var(--gradient-primary)',
-				'gradient-secondary': 'var(--gradient-secondary)',
-				'gradient-neon': 'var(--gradient-neon)'
-			},
-			boxShadow: {
-				'neon': 'var(--shadow-neon)',
-				'glow': 'var(--shadow-glow)'
-			},
-			fontFamily: {
-				'mono': ['JetBrains Mono', 'Consolas', 'Monaco', 'monospace'],
-				'sans': ['Inter', 'system-ui', 'sans-serif']
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -89,29 +62,22 @@ export default {
 			},
 			keyframes: {
 				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+					from: { height: '0' },
+					to: { height: 'var(--radix-accordion-content-height)' }
 				},
 				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
-				}
+					from: { height: 'var(--radix-accordion-content-height)' },
+					to: { height: '0' }
+				},
+        'aurora': {
+          from: { backgroundPosition: '0% 50%' },
+          to: { backgroundPosition: '100% 50%' },
+        },
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'pulse-glow': 'pulse-glow 2s ease-in-out infinite alternate',
-				'slide-in': 'slide-in 0.3s ease-out',
-				'countdown-pulse': 'countdown-pulse 1s ease-in-out infinite',
-				'rotate-progress': 'rotate-progress 1s linear infinite'
+        'aurora': 'aurora 15s ease infinite alternate',
 			}
 		}
 	},

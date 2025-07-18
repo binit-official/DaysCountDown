@@ -14,7 +14,8 @@ import { UserNav } from '@/components/UserNav';
 import { Card } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { AlertTriangle, Zap } from 'lucide-react';
+import { AlertTriangle, Zap, Flame, Target } from 'lucide-react';
+import { Footer } from '@/components/Footer';
 
 const Index = () => {
   const { user } = useAuth();
@@ -32,7 +33,6 @@ const Index = () => {
       if (roadmap?.startDate) {
         const startDate = roadmap.startDate.toDate ? roadmap.startDate.toDate() : new Date(roadmap.startDate);
         const now = new Date();
-        // Set both dates to the start of the day for an accurate day difference calculation
         startDate.setHours(0, 0, 0, 0);
         now.setHours(0, 0, 0, 0);
         const day = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
@@ -59,7 +59,7 @@ const Index = () => {
         setCurrentDay(updatedCurrentDay);
         setSelectedDay(updatedCurrentDay);
       }
-    }, 60000); // Check every minute to see if the day has changed
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [roadmap, currentDay]);
@@ -136,15 +136,17 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="relative overflow-hidden border-b border-primary/30">
         <div className="absolute inset-0 bg-gradient-neon opacity-20"></div>
         <div className="relative container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Logo />
             <div className="text-center">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black gradient-text">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black gradient-text flex items-center gap-4">
+                <Flame className="w-8 h-8 md:w-12 md:h-12 text-accent animate-pulse" />
                 DAYS COUNT DOWN
+                <Target className="w-8 h-8 md:w-12 md:h-12 text-accent animate-pulse" />
               </h1>
             </div>
             <UserNav />
@@ -152,10 +154,8 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-4 md:py-8">
+      <main className="container mx-auto px-4 py-4 md:py-8 flex-grow">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-          {/* Left Column: Mission Control */}
           <div className="lg:col-span-3 space-y-6">
             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
               <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} />
@@ -170,8 +170,6 @@ const Index = () => {
               </div>
             </Card>
           </div>
-
-          {/* Center Column: Main Focus */}
           <div className="lg:col-span-6 space-y-6">
             <Card className="p-4 md:p-8 neon-border bg-card/90 backdrop-blur-sm">
               {selectedTask ? (
@@ -185,8 +183,6 @@ const Index = () => {
             </Card>
             <MotivationalQuote />
           </div>
-
-          {/* Right Column: Daily Actions & Intel */}
           <div className="lg:col-span-3 space-y-6">
             <DailyTaskCard roadmap={roadmap} selectedDay={selectedDay} onRoadmapUpdate={handleDailyTaskUpdate} currentDay={currentDay} />
             <AIAssistant
@@ -195,10 +191,13 @@ const Index = () => {
               hasIncompleteTasks={hasIncompleteTasks}
               allTasksCompleted={allTasksCompleted}
             />
-            <Roadmap roadmap={roadmap} selectedDay={selectedDay} onSelectDay={setSelectedDay} currentDay={currentDay} />
           </div>
         </div>
+        <div className="mt-8 lg:mt-12">
+          <Roadmap roadmap={roadmap} selectedDay={selectedDay} onSelectDay={setSelectedDay} currentDay={currentDay} />
+        </div>
       </main>
+      <Footer />
     </div>
   );
 };

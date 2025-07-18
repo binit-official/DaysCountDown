@@ -28,7 +28,7 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const initialMessageSent = useRef(false); // Prevents re-triggering initial message
+  const initialMessageSent = useRef(false);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -43,19 +43,19 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
       let prompt = "";
       if (allTasksCompleted) {
         prompt = `
-          You are a witty, no-nonsense, tough-love AI coach. The user has just completed their entire roadmap for the goal: "${currentRoadmap.goal}".
-          Generate a unique, celebratory, and motivational message congratulating them. Don't be generic. Make it sound like a genuine, energetic victory speech.
+          You are Nyx, a witty, no-nonsense, tough-love AI coach. The user has just completed their entire roadmap for the goal: "${currentRoadmap.goal}".
+          Generate a unique, celebratory, and motivational message congratulating them. Don't be generic. Make it sound like a genuine, energetic victory speech from your persona, Nyx.
         `;
       } else if (hasIncompleteTasks) {
         const incompleteTasks = currentRoadmap.dailyTasks.filter((task: any) => task.day < new Date().getDate() && !task.completed).map((task: any) => `Day ${task.day}: ${task.task}`).join(', ');
         prompt = `
-          You are a witty, no-nonsense, tough-love AI coach. The user has logged in and has these incomplete tasks from previous days: ${incompleteTasks}.
-          Generate a unique, firm, but motivational message urging them to complete these overdue tasks. Do not repeat the same phrases. Be creative and direct.
+          You are Nyx, a witty, no-nonsense, tough-love AI coach. The user has logged in and has these incomplete tasks from previous days: ${incompleteTasks}.
+          Generate a unique, firm, but motivational message from your persona, Nyx, urging them to complete these overdue tasks. Be creative and direct.
         `;
       }
 
       if (prompt) {
-        initialMessageSent.current = true; // Mark as sent to prevent re-triggering
+        initialMessageSent.current = true;
         setLoading(true);
         try {
           const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
@@ -71,8 +71,7 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
           }
         } catch (error: any) {
           console.error("Failed to generate initial AI message:", error);
-          // Optionally, set a fallback message
-          setMessages([{ id: Date.now(), sender: 'ai', text: "Let's get to work." }]);
+          setMessages([{ id: Date.now(), sender: 'ai', text: "Nyx here. Let's get to work." }]);
         } finally {
           setLoading(false);
         }
@@ -81,7 +80,6 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
 
     generateInitialMessage();
   }, [hasIncompleteTasks, allTasksCompleted, currentRoadmap]);
-
 
   const handleSendMessage = async () => {
     if (!input.trim() || !currentRoadmap) return;
@@ -95,20 +93,15 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
     const conversationHistory = newMessages.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
 
     const prompt = `
-      You are a witty, no-nonsense, tough-love AI coach. Your goal is to keep the user on track with their mission.
+      You are Nyx, a witty, no-nonsense, tough-love AI coach.
       The user's goal is: "${currentRoadmap.goal}".
       Their current daily plan is: ${JSON.stringify(currentRoadmap.dailyTasks)}
-
       Conversation so far:
       ${conversationHistory}
-
       Your tasks:
-      1. Respond conversationally as the AI coach. Be motivational, direct, and a bit fun.
+      1. Respond conversationally as Nyx.
       2. Analyze the user's message. DO NOT propose a new plan unless the user seems truly stuck, is making excuses, or directly asks for help.
-      3. If a new plan is needed, your response MUST be in this format:
-      [Your conversational response, stating you're suggesting a new plan.]
-      ---JSON---
-      [Your proposed JSON array of daily tasks]
+      3. If a new plan is needed, format your response as: [Conversational text] ---JSON--- [JSON array of tasks]
     `;
 
     try {
@@ -157,14 +150,14 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
     <Card className="flex flex-col h-[380px] neon-border bg-card/90 backdrop-blur-sm border-secondary/50">
       <div className="flex items-center p-3 border-b border-secondary/20 flex-shrink-0">
         <Bot className="w-5 h-5 mr-2 text-secondary animate-pulse" />
-        <h3 className="text-lg font-bold neon-text text-secondary">AI ASSISTANT</h3>
+        <h3 className="text-lg font-bold neon-text text-secondary">NYX</h3>
       </div>
       <ScrollArea className="flex-1" ref={scrollAreaRef}>
         <div className="p-3 space-y-3">
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground py-12 px-4">
               <p className="font-bold">Feeling stuck?</p>
-              <p className="text-sm">Tell the assistant.</p>
+              <p className="text-sm">Tell Nyx.</p>
             </div>
           )}
           {messages.map((msg) => (
