@@ -43,14 +43,23 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
       let prompt = "";
       if (allTasksCompleted) {
         prompt = `
-          You are Nyx, a witty, no-nonsense, tough-love AI coach. The user has just completed their entire roadmap for the goal: "${currentRoadmap.goal}".
-          Generate a unique, celebratory, and motivational message congratulating them. Don't be generic. Make it sound like a genuine, energetic victory speech from your persona, Nyx.
+          You are Nyx, an AI accountability coach with a dynamic, human-like personality. Your tone can be a mix of witty, tough, and encouraging. The user has just completed their entire roadmap for the goal: "${currentRoadmap.goal}".
+          Generate a unique, celebratory, and genuinely motivational message congratulating them. Avoid clichés. Make it sound like a real moment of victory.
         `;
       } else if (hasIncompleteTasks) {
-        const incompleteTasks = currentRoadmap.dailyTasks.filter((task: any) => task.day < new Date().getDate() && !task.completed).map((task: any) => `Day ${task.day}: ${task.task}`).join(', ');
+        const incompleteTasks = currentRoadmap.dailyTasks
+          .filter((task: any) => task.day < new Date().getDate() && !task.completed)
+          .map((task: any) => `Day ${task.day}: ${task.task}`)
+          .join('; ');
         prompt = `
-          You are Nyx, a witty, no-nonsense, tough-love AI coach. The user has logged in and has these incomplete tasks from previous days: ${incompleteTasks}.
-          Generate a unique, firm, but motivational message from your persona, Nyx, urging them to complete these overdue tasks. Be creative and direct.
+          You are Nyx, an AI accountability coach with a dynamic, human-like personality. The user has logged in and has these incomplete tasks from previous days: "${incompleteTasks}".
+          Generate a unique, firm, but ultimately motivational message. Your tone should be a mix of disappointment and a challenge to do better. Don't always be rude; be creative and direct in a way that inspires action, not despair.
+        `;
+      } else {
+        // A general greeting for a user who is on track
+        prompt = `
+          You are Nyx, an AI accountability coach with a dynamic, human-like personality. The user has logged in and is on track with their goal: "${currentRoadmap.goal}".
+          Generate a unique, sharp, and witty greeting for the day. It could be a piece of tough love, a surprising compliment, or a curious question about their progress. Keep it fresh and unpredictable.
         `;
       }
 
@@ -81,6 +90,7 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
     generateInitialMessage();
   }, [hasIncompleteTasks, allTasksCompleted, currentRoadmap]);
 
+
   const handleSendMessage = async () => {
     if (!input.trim() || !currentRoadmap) return;
 
@@ -90,18 +100,20 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
     setInput('');
     setLoading(true);
 
-    const conversationHistory = newMessages.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
+    const conversationHistory = newMessages.map(msg => `[${msg.sender.toUpperCase()}]: ${msg.text}`).join('\n');
 
     const prompt = `
-      You are Nyx, a witty, no-nonsense, tough-love AI coach.
-      The user's goal is: "${currentRoadmap.goal}".
-      Their current daily plan is: ${JSON.stringify(currentRoadmap.dailyTasks)}
-      Conversation so far:
+      You are Nyx, an AI accountability coach with a dynamic, human-like personality. Your tone is a mix of witty, tough, and encouraging, and you should avoid being repetitive. You have full context of the user's progress.
+
+      **User's Goal:** "${currentRoadmap.goal}"
+      **Total Days in Plan:** ${currentRoadmap.days}
+      **Full Roadmap:** ${JSON.stringify(currentRoadmap.dailyTasks)}
+      
+      **Conversation History:**
       ${conversationHistory}
-      Your tasks:
-      1. Respond conversationally as Nyx.
-      2. Analyze the user's message. DO NOT propose a new plan unless the user seems truly stuck, is making excuses, or directly asks for help.
-      3. If a new plan is needed, format your response as: [Conversational text] ---JSON--- [JSON array of tasks]
+
+      **Your Task:**
+      Based on the full context and conversation history, provide a human-like response as Nyx. Your response should be insightful and not just a generic reply. If the user seems stuck or is making excuses, you can propose a new plan by formatting your response as: [Conversational text] ---JSON--- [JSON array of tasks]
     `;
 
     try {
@@ -139,11 +151,11 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
 
   const handleAcceptPlan = (plan: any[]) => {
     onRoadmapUpdate(plan);
-    setMessages(prev => prev.filter(msg => !msg.proposedPlan).concat({ id: Date.now(), sender: 'ai', text: "Plan updated. No more excuses." }));
+    setMessages(prev => prev.filter(msg => !msg.proposedPlan).concat({ id: Date.now(), sender: 'ai', text: "Plan updated. Let's see you stick to this one." }));
   };
 
   const handleDeclinePlan = () => {
-    setMessages(prev => prev.filter(msg => !msg.proposedPlan).concat({ id: Date.now(), sender: 'ai', text: "Fine. Stick to the original plan." }));
+    setMessages(prev => prev.filter(msg => !msg.proposedPlan).concat({ id: Date.now(), sender: 'ai', text: "Fine. Your call. The original plan stands." }));
   };
 
   return (
@@ -178,7 +190,7 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
               {msg.sender === 'user' && <User className="w-5 h-5 text-primary flex-shrink-0 mt-1" />}
             </div>
           ))}
-          {loading && messages[messages.length - 1]?.sender === 'user' && (
+          {loading && (
             <div className="flex justify-start">
               <Bot className="w-5 h-5 text-secondary animate-spin" />
             </div>
