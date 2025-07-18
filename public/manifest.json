@@ -1,0 +1,21 @@
+{
+  "name": "Days Count Down",
+  "short_name": "DaysCountDown",
+  "description": "Your brutal accountability partner to help you achieve your goals.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#0f172a",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
