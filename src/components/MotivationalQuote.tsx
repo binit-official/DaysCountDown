@@ -31,7 +31,7 @@ const mockingQuotes = [
   "Success is uncomfortable. Get used to it.",
   "Failure is comfortable. Stop getting comfortable.",
   "Your goals are not suggestions. They're demands.",
-<<<<<<< HEAD
+
   "Deadline approaching: PANIC or PERFORM?",
   "That 'one day' you're waiting for is today. The clock is ticking.",
   "Are you busy or just busy making excuses?",
@@ -110,10 +110,9 @@ const mockingQuotes = [
   "The future belongs to those who believe in the beauty of their dreams.",
   "The temptation to quit will be greatest just before you are about to succeed.",
   "Either you run the day, or the day runs you.",
-  "Don't be afraid to give up the good to go for the great."
-=======
-  "Deadline approaching: PANIC or PERFORM?"
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
+  "Don't be afraid to give up the good to go for the great.",
+  "Deadline approaching: PANIC or PERFORM?",
+
 ];
 
 export const MotivationalQuote = () => {

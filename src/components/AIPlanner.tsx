@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // src/components/AIPlanner.tsx
 
 import React, { useState, useEffect } from 'react';
@@ -9,11 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Zap } from 'lucide-react';
-=======
-import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 
 interface DailyTask {
   day: number;
@@ -65,24 +59,15 @@ const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
 
     const prompt = `
       Create a detailed ${days}-day roadmap to achieve the goal: "${goal}".
-<<<<<<< HEAD
       For each day, provide a detailed, multi-part task using semicolons as a delimiter. For example: "Watch 2 lectures on React Hooks; build 1 small component; read 1 chapter of the documentation."
-=======
-      For each day, provide a detailed, multi-part task. For example: "Watch 2 lectures on React Hooks, build 1 small component, and read 1 chapter of the documentation."
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
       Also, for each day, provide a difficulty rating from one of these four options: 'Easy', 'Medium', 'Hard', 'Challenge'.
 
       Respond ONLY with a valid JSON array of objects. Each object must have three fields:
       1. "day" (number)
       2. "task" (string, the detailed multi-part task)
       3. "difficulty" (string, one of 'Easy', 'Medium', 'Hard', 'Challenge')
-<<<<<<< HEAD
 
       Example: [{"day": 1, "task": "Task A; Task B; Task C", "difficulty": "Medium"}]
-=======
-      
-      Example: [{"day": 1, "task": "Task A, Task B, Task C", "difficulty": "Medium"}]
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
     `;
 
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
@@ -132,7 +117,6 @@ const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
   };
 
   return (
-<<<<<<< HEAD
     <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
         <h3 className="text-lg font-bold mb-4 flex items-center">
             <Zap className="w-5 h-5 mr-2 text-primary" />
@@ -168,23 +152,6 @@ const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
             {error && <p className="mt-2 text-red-500 text-sm font-semibold">{error}</p>}
         </div>
     </Card>
-=======
-    <div className="p-4 bg-card rounded-md shadow-md h-full">
-      <h2 className="text-xl font-bold mb-4">AI Mission Planner 🚀</h2>
-       <div className="mb-4">
-            <label htmlFor="goal" className="block font-semibold mb-1">Goal:</label>
-            <input id="goal" type="text" value={goal} onChange={(e) => setGoal(e.target.value)} className="w-full p-2 border border-gray-300 rounded text-black bg-white" placeholder="e.g., Master React in 45 Days" />
-        </div>
-        <div className="mb-4">
-            <label htmlFor="days" className="block font-semibold mb-1">Days:</label>
-            <input id="days" type="number" value={days} onChange={(e) => setDays(Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded text-black bg-white" min={1} max={365} />
-        </div>
-        <button onClick={generateRoadmap} disabled={loading} className="w-full px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50">
-            {loading ? 'Generating...' : 'Generate New Plan'}
-        </button>
-        {error && <p className="mt-4 text-red-600 font-semibold">Error: {error}</p>}
-    </div>
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
   );
 };
 

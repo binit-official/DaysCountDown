@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 // src/pages/Index.tsx
 
-=======
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CountdownTimer } from '@/components/CountdownTimer';
@@ -11,7 +8,6 @@ import { TaskManager, Task } from '@/components/TaskManager';
 import AIPlanner from '@/components/AIPlanner';
 import { AIAssistant } from '@/components/AIAssistant';
 import { DailyTaskCard } from '@/components/DailyTaskCard';
-<<<<<<< HEAD
 import { Roadmap } from '@/components/Roadmap';
 import { Logo } from '@/components/Logo';
 import { UserNav } from '@/components/UserNav';
@@ -19,23 +15,6 @@ import { Card } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { AlertTriangle, Zap } from 'lucide-react';
-=======
-import { Logo } from '@/components/Logo';
-import { UserNav } from '@/components/UserNav';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, Zap, Target, Clock, Flame } from 'lucide-react';
-
-const difficultyColors = {
-  Easy: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  Medium: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-  Hard: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  Challenge: 'bg-red-500/20 text-red-300 border-red-500/30 animate-pulse',
-};
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 
 const Index = () => {
   const { user } = useAuth();
@@ -43,7 +22,6 @@ const Index = () => {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [roadmap, setRoadmap] = useState<any | null>(null);
-<<<<<<< HEAD
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [currentDay, setCurrentDay] = useState<number>(1);
   const [hasIncompleteTasks, setHasIncompleteTasks] = useState(false);
@@ -81,12 +59,10 @@ const Index = () => {
         setCurrentDay(updatedCurrentDay);
         setSelectedDay(updatedCurrentDay);
       }
-    }, 60000);
+    }, 60000); // Check every minute to see if the day has changed
 
     return () => clearInterval(interval);
   }, [roadmap, currentDay]);
-=======
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
 
   useEffect(() => {
     if (!user) return;
@@ -128,18 +104,13 @@ const Index = () => {
     const docRef = doc(db, 'users', user.uid, 'data', 'tasks');
     await setDoc(docRef, { tasks: updatedTasks }, { merge: true });
   };
-<<<<<<< HEAD
 
-=======
-  
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
   const handleRoadmapUpdate = (newRoadmap: any) => {
     if (!user) return;
     setRoadmap(newRoadmap);
     const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
     setDoc(roadmapDocRef, newRoadmap, { merge: true });
   };
-<<<<<<< HEAD
 
   const handleDailyTaskUpdate = (updatedDailyTasks: any[]) => {
     if (!user || !roadmap) return;
@@ -147,9 +118,6 @@ const Index = () => {
     handleRoadmapUpdate(updatedRoadmap);
   };
 
-=======
-  
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
   const handleAssistantUpdate = (updatedTasks: any[]) => {
      if (!user || !roadmap) return;
      const updatedRoadmap = { ...roadmap, dailyTasks: updatedTasks };
@@ -186,24 +154,14 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-4 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-<<<<<<< HEAD
-=======
-          
+
           {/* Left Column: Mission Control */}
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
           <div className="lg:col-span-3 space-y-6">
             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
               <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} />
             </Card>
-<<<<<<< HEAD
             <AIPlanner onRoadmapChange={handleRoadmapUpdate} />
             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm border-accent/50">
-=======
-            <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
-              <AIPlanner onRoadmapChange={handleRoadmapUpdate} />
-            </Card>
-             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm border-accent/50">
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
               <h3 className="text-lg font-black neon-text mb-4">HARSH TRUTH</h3>
               <div className="space-y-3">
                 <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Active Missions</span><span className="font-black text-primary text-lg">{tasks.length}</span></div>
@@ -212,11 +170,8 @@ const Index = () => {
               </div>
             </Card>
           </div>
-<<<<<<< HEAD
-=======
 
           {/* Center Column: Main Focus */}
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
           <div className="lg:col-span-6 space-y-6">
             <Card className="p-4 md:p-8 neon-border bg-card/90 backdrop-blur-sm">
               {selectedTask ? (
@@ -230,7 +185,8 @@ const Index = () => {
             </Card>
             <MotivationalQuote />
           </div>
-<<<<<<< HEAD
+
+          {/* Right Column: Daily Actions & Intel */}
           <div className="lg:col-span-3 space-y-6">
             <DailyTaskCard roadmap={roadmap} selectedDay={selectedDay} onRoadmapUpdate={handleDailyTaskUpdate} currentDay={currentDay} />
             <AIAssistant
@@ -240,33 +196,6 @@ const Index = () => {
               allTasksCompleted={allTasksCompleted}
             />
             <Roadmap roadmap={roadmap} selectedDay={selectedDay} onSelectDay={setSelectedDay} currentDay={currentDay} />
-=======
-
-          {/* Right Column: Daily Actions & Intel */}
-          <div className="lg:col-span-3 space-y-6">
-            <DailyTaskCard roadmap={roadmap} />
-            <AIAssistant currentRoadmap={roadmap} onRoadmapUpdate={handleAssistantUpdate} />
-            <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
-              <h3 className="text-lg font-bold mb-4">Full Roadmap</h3>
-              <ScrollArea className="h-64">
-                {roadmap?.dailyTasks?.length > 0 ? (
-                  <ul className="space-y-3 pr-4">
-                    {roadmap.dailyTasks.map((task: any) => (
-                      <li key={task.day} className="text-sm border-b border-muted/20 pb-3 relative">
-                        <Badge variant="outline" className={`absolute top-0 right-0 text-xs ${difficultyColors[task.difficulty as keyof typeof difficultyColors] || difficultyColors.Medium}`}>
-                          {task.difficulty}
-                        </Badge>
-                        <strong className="text-primary">Day {task.day}:</strong>
-                        <p className="mt-1 text-muted-foreground">{task.task}</p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground text-sm p-4 text-center">Generate a roadmap to see your full plan.</p>
-                )}
-              </ScrollArea>
-            </Card>
->>>>>>> 776f5e8f3069168216dee8446b79c4ecb0ccfdcb
           </div>
         </div>
       </main>
