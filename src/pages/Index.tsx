@@ -1,5 +1,3 @@
-// src/pages/Index.tsx
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CountdownTimer } from '@/components/CountdownTimer';
@@ -96,6 +94,7 @@ const Index = () => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             const lastCompleted = data.lastCompleted?.toDate();
+            // This resets the streak if the user has missed a day.
             if (lastCompleted && !isToday(lastCompleted) && !isYesterday(lastCompleted)) {
                 await updateDoc(statsDocRef, { streak: 0 });
             }
@@ -134,10 +133,13 @@ const Index = () => {
 
     const lastCompletedDate = stats.lastCompleted?.toDate();
 
+    // If a task for today has already been completed and logged, do nothing.
     if (lastCompletedDate && isToday(lastCompletedDate)) {
       return;
     }
 
+    // If the last completed task was yesterday, increment the streak.
+    // Otherwise, start a new streak of 1.
     const newStreak = (lastCompletedDate && isYesterday(lastCompletedDate))
       ? (stats.streak || 0) + 1
       : 1;
@@ -149,29 +151,27 @@ const Index = () => {
     const newStats = {
       ...stats,
       streak: newStreak,
-      lastCompleted: new Date(),
-      unlockedAchievements: newAchievements
+      lastCompleted: new Date(), // Set lastCompleted to now.
+      unlockedAchievements: [...new Set(newAchievements)],
     };
 
     await setDoc(statsDocRef, newStats, { merge: true });
-    toast.success(`Streak extended to ${newStreak} days!`);
+    toast.success(`🔥 Streak extended to ${newStreak} days!`);
   };
-
+  
   const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
     if (!user || !roadmap) return;
-    
-    const newlyCompletedTask = updatedDailyTasks.find(t => {
-      const originalTask = roadmap.dailyTasks.find((ot: any) => ot.day === t.day);
-      return t.day === currentDay && t.completed && (!originalTask || !originalTask.completed);
-    });
 
     const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
     setRoadmap(updatedRoadmap);
 
-    if (newlyCompletedTask) {
+    const todayTasks = updatedDailyTasks.filter(task => task.day === currentDay);
+    const allTodayComplete = todayTasks.length > 0 && todayTasks.every(task => task.completed);
+
+    if (allTodayComplete) {
       await checkStreaksAndAchievements();
     }
-    
+
     const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
     await setDoc(roadmapDocRef, updatedRoadmap, { merge: true });
   };
@@ -194,7 +194,7 @@ const Index = () => {
     if (taskToArchive.priority === 'extreme') stats.unlockedAchievements.push('extreme_1');
 
     await setDoc(statsDocRef, { ...stats, unlockedAchievements: [...new Set(stats.unlockedAchievements)] }, { merge: true });
-    
+
     toast.success(`Mission "${taskToArchive.title}" archived!`);
   };
 
