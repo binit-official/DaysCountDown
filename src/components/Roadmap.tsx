@@ -48,8 +48,12 @@ export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: Roadm
     );
   }
   
-  // Now we can trust roadmap.startDate is a valid Date object from Index.tsx
-  const startDate = roadmap.startDate;
+  const startDate = roadmap.startDate instanceof Date ? roadmap.startDate : new Date();
+  if (!isValid(startDate)) {
+      console.error("Roadmap received an invalid startDate.");
+      return <div>Error: Invalid roadmap start date.</div>
+  }
+
 
   return (
     <Card className="p-4 md:p-6 neon-border bg-card/90 backdrop-blur-sm animate-fade-in-up">
@@ -69,30 +73,33 @@ export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: Roadm
 
               return (
                 <li
-                  key={`${task.day}-${index}`} // Using index to ensure key is always unique
+                  key={`${task.day}-${index}`} 
                   ref={task.day === currentDay ? currentDayRef : null}
                   className="relative pl-6 cursor-pointer group"
                   onClick={() => onSelectDay(task.day)}
                 >
                   <div className={`absolute -left-2.5 top-1 w-5 h-5 rounded-full border-4 transition-colors ${isSelected ? 'border-primary bg-primary/50' : 'border-card bg-border group-hover:bg-primary/50'}`} />
                   <div className="transition-transform duration-300 group-hover:translate-x-2">
-                    <div className="flex items-baseline space-x-3">
-                      <strong className="text-primary text-lg">Day {task.day}</strong>
-                      <span className="text-sm font-semibold text-muted-foreground">{formattedDate}</span>
-                      <div className="flex-grow" />
-                      {task.day < currentDay && (
-                        task.completed ? (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        ) : (
-                          <AlertTriangle className="w-5 h-5 text-red-500 animate-pulse" />
-                        )
-                      )}
-                      {task.day === currentDay && !task.completed && (
-                          <Radio className="w-5 h-5 text-primary animate-pulse" />
-                      )}
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 flex-shrink-0">
+                        {task.completed && (
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                        )}
+                      </div>
+                      <div className="flex items-baseline space-x-3 flex-grow">
+                        <strong className="text-primary text-lg">Day {task.day}</strong>
+                        <span className="text-sm font-semibold text-muted-foreground">{formattedDate}</span>
+                        <div className="flex-grow" />
+                        {task.day < currentDay && !task.completed && (
+                            <AlertTriangle className="w-5 h-5 text-red-500 animate-pulse" />
+                        )}
+                        {task.day === currentDay && !task.completed && (
+                            <Radio className="w-5 h-5 text-primary animate-pulse" />
+                        )}
+                      </div>
                     </div>
-                    <p className="mt-1 text-base text-foreground/80">{task.task}</p>
-                    <div className="mt-2 text-left">
+                    <p className="mt-1 text-base text-foreground/80 pl-7">{task.task}</p>
+                    <div className="mt-2 text-left pl-7">
                         <Badge variant="outline" className={`text-xs ${difficultyColors[task.difficulty as keyof typeof difficultyColors] || difficultyColors.Medium}`}>
                           {task.difficulty}
                         </Badge>
