@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckCircle, AlertTriangle, Radio } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 interface RoadmapProps {
   roadmap: any | null;
@@ -27,24 +27,17 @@ export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: Roadm
   const hasAutoScrolled = useRef(false);
 
   useEffect(() => {
-    // This effect ensures that we only auto-scroll once when the component
-    // has fully loaded with the roadmap data.
     if (roadmap && currentDayRef.current && scrollViewportRef.current && !hasAutoScrolled.current) {
       const viewport = scrollViewportRef.current;
       const element = currentDayRef.current;
-      
       const topPos = element.offsetTop - viewport.offsetTop;
 
-      // Use a timeout to make sure the DOM is fully painted before scrolling
       setTimeout(() => {
-        viewport.scrollTo({
-          top: topPos,
-          behavior: 'smooth'
-        });
+        viewport.scrollTo({ top: topPos, behavior: 'smooth' });
         hasAutoScrolled.current = true;
       }, 100);
     }
-  }, [roadmap]); // Depend only on `roadmap` to trigger the initial scroll correctly.
+  }, [roadmap]);
 
   if (!roadmap || !roadmap.dailyTasks || roadmap.dailyTasks.length === 0) {
     return (
@@ -54,36 +47,38 @@ export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: Roadm
       </Card>
     );
   }
-
-  const startDate = roadmap.startDate ? (roadmap.startDate.toDate ? roadmap.startDate.toDate() : new Date(roadmap.startDate)) : new Date();
+  
+  // Now we can trust roadmap.startDate is a valid Date object from Index.tsx
+  const startDate = roadmap.startDate;
 
   return (
     <Card className="p-4 md:p-6 neon-border bg-card/90 backdrop-blur-sm animate-fade-in-up">
       <h3 className="text-2xl font-bold mb-6 text-center gradient-text">Your Mission Blueprint</h3>
       <ScrollArea className="h-[400px] lg:h-[500px]" viewportRef={scrollViewportRef} scrollbarClassName="invisible">
         <div className="relative pl-6">
-          {/* Vertical timeline bar */}
           <div className="absolute left-0 top-0 h-full w-0.5 bg-border/50" />
           <ul className="space-y-8">
-            {roadmap.dailyTasks.map((task: any) => {
+            {roadmap.dailyTasks.map((task: any, index: number) => {
               const taskDate = new Date(startDate);
-              taskDate.setDate(startDate.getDate() + task.day - 1);
+              if (isValid(taskDate)) {
+                  taskDate.setDate(startDate.getDate() + (task.day - 1));
+              }
               const isSelected = selectedDay === task.day;
+              
+              const formattedDate = isValid(taskDate) ? format(taskDate, 'MMMM d') : 'Date Error';
 
               return (
                 <li
-                  key={task.day}
+                  key={`${task.day}-${index}`} // Using index to ensure key is always unique
                   ref={task.day === currentDay ? currentDayRef : null}
                   className="relative pl-6 cursor-pointer group"
                   onClick={() => onSelectDay(task.day)}
                 >
-                  {/* Timeline Dot */}
                   <div className={`absolute -left-2.5 top-1 w-5 h-5 rounded-full border-4 transition-colors ${isSelected ? 'border-primary bg-primary/50' : 'border-card bg-border group-hover:bg-primary/50'}`} />
-
                   <div className="transition-transform duration-300 group-hover:translate-x-2">
                     <div className="flex items-baseline space-x-3">
                       <strong className="text-primary text-lg">Day {task.day}</strong>
-                      <span className="text-sm font-semibold text-muted-foreground">{format(taskDate, 'MMMM d')}</span>
+                      <span className="text-sm font-semibold text-muted-foreground">{formattedDate}</span>
                       <div className="flex-grow" />
                       {task.day < currentDay && (
                         task.completed ? (

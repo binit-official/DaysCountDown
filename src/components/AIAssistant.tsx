@@ -10,7 +10,6 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 
 interface AIAssistantProps {
   currentRoadmap: any | null;
-  onRoadmapUpdate: (updatedTasks: any[]) => void;
   hasIncompleteTasks: boolean;
   allTasksCompleted: boolean;
   currentDay: number;
@@ -21,12 +20,11 @@ interface Message {
   id: number;
   sender: 'user' | 'ai';
   text: string;
-  proposedPlan?: any[];
 }
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTasks, allTasksCompleted, currentDay, isNewUser }: AIAssistantProps) => {
+export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksCompleted, currentDay, isNewUser }: AIAssistantProps) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -82,7 +80,7 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
   useEffect(() => {
     setMessages([]);
     generateInitialMessage();
-  }, [aiPersona, isNewUser]);
+  }, [aiPersona, isNewUser, currentRoadmap]);
 
 
   const handleSendMessage = async () => {
@@ -97,17 +95,17 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
     const conversationHistory = newMessages.map(msg => `[${msg.sender.toUpperCase()}]: ${msg.text}`).join('\n');
     
     const nyxPrompt = `
-      You are Nyx, an AI accountability coach with a sharp, witty, and direct personality. The user's current goal is: "${currentRoadmap?.goal || 'Not set'}".
+      You are Nyx, an AI accountability coach with a sharp, witty, and direct personality. Your role is to be a conversational partner. The user's current goal is: "${currentRoadmap?.goal || 'Not set'}".
       If the message is about their goal or productivity, provide tough-love advice. If it's a general question, you can answer it but with your unique, slightly impatient and sarcastic personality.
-      If you propose a new plan, YOU MUST format your response as: [Conversational text] ---JSON--- [A valid JSON array of updated tasks]. There should be NO text after the JSON block.
+      You are NOT allowed to modify the user's plan. Do not output JSON or suggest changes to their tasks.
       Conversation History:
       ${conversationHistory}
     `;
 
     const generalPrompt = `
-      You are a standard, helpful, and friendly AI assistant.
+      You are a standard, helpful, and friendly AI assistant. Your role is to be a conversational partner.
       The user is using a productivity application, but your role in this mode is to be a general assistant.
-      Answer the user's question directly and clearly based on the conversation history.
+      Answer the user's question directly and clearly based on the conversation history. Do not output code or structured data unless explicitly asked.
       Conversation History:
       ${conversationHistory}
     `;
@@ -126,18 +124,7 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
         const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!rawContent) throw new Error('Invalid API response.');
 
-        const parts = rawContent.split('---JSON---');
-        const conversationalText = parts[0].trim();
-        let jsonText = parts.length > 1 ? parts[1].trim() : null;
-
-        const aiMessage: Message = { id: Date.now() + 1, sender: 'ai', text: conversationalText };
-
-        if (jsonText && aiPersona === 'nyx') {
-            const jsonMatch = jsonText.match(/(\[.*\]|\{.*\})/s);
-            if (jsonMatch) {
-                aiMessage.proposedPlan = JSON.parse(jsonMatch[0]);
-            }
-        }
+        const aiMessage: Message = { id: Date.now() + 1, sender: 'ai', text: rawContent.trim() };
         
         setMessages(prev => [...prev, aiMessage]);
     } catch (err: any) {
@@ -155,15 +142,6 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
   const handleNewChat = () => {
     setMessages([]);
     generateInitialMessage();
-  };
-
-  const handleAcceptPlan = (plan: any[]) => {
-    onRoadmapUpdate(plan);
-    setMessages(prev => prev.filter(msg => !msg.proposedPlan).concat({ id: Date.now(), sender: 'ai', text: "Plan updated. Let's see you stick to this one." }));
-  };
-
-  const handleDeclinePlan = () => {
-    setMessages(prev => prev.filter(msg => !msg.proposedPlan).concat({ id: Date.now(), sender: 'ai', text: "Fine. Your call. The original plan stands." }));
   };
 
   return (
@@ -193,15 +171,6 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
               {msg.sender === 'ai' && <Bot className="w-5 h-5 text-secondary flex-shrink-0 mt-1" />}
               <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-primary/20' : 'bg-secondary/10'}`}>
                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                {msg.proposedPlan && aiPersona === 'nyx' && (
-                  <div className="mt-2 pt-2 border-t border-secondary/20 space-y-1">
-                    <p className="text-xs font-bold text-secondary">PROPOSED PLAN:</p>
-                    <div className="flex gap-2">
-                       <Button size="sm" onClick={() => handleAcceptPlan(msg.proposedPlan!)} className="h-7">Accept</Button>
-                       <Button size="sm" variant="outline" onClick={handleDeclinePlan} className="h-7">Decline</Button>
-                    </div>
-                  </div>
-                )}
               </div>
               {msg.sender === 'user' && <User className="w-5 h-5 text-primary flex-shrink-0 mt-1" />}
             </div>

@@ -29,58 +29,56 @@ const Index = () => {
   const [allTasksCompleted, setAllTasksCompleted] = useState(false);
 
   useEffect(() => {
-    const calculateCurrentDay = () => {
-      if (roadmap?.startDate) {
-        const startDate = roadmap.startDate.toDate ? roadmap.startDate.toDate() : new Date(roadmap.startDate);
+    const calculateCurrentDay = (startDate: Date | undefined) => {
+      if (startDate && !isNaN(startDate.getTime())) {
         const now = new Date();
-        startDate.setHours(0, 0, 0, 0);
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
         now.setHours(0, 0, 0, 0);
-        const day = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const day = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         return day > 0 ? day : 1;
       }
       return 1;
     };
 
-    if (roadmap?.dailyTasks) {
-      const day = calculateCurrentDay();
+    if (roadmap?.dailyTasks && roadmap.startDate) {
+      const day = calculateCurrentDay(roadmap.startDate);
       setCurrentDay(day);
-      if (selectedDay === 1) { // Only set selected day on initial load
-        setSelectedDay(day);
-      }
-
+      
       const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
       setHasIncompleteTasks(incomplete);
 
       const allComplete = roadmap.dailyTasks.every((task: any) => task.completed);
       setAllTasksCompleted(allComplete);
     }
-
-    const interval = setInterval(() => {
-      const updatedCurrentDay = calculateCurrentDay();
-      if (updatedCurrentDay !== currentDay) {
-        setCurrentDay(updatedCurrentDay);
-        setSelectedDay(updatedCurrentDay);
-      }
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [roadmap, currentDay, selectedDay]);
+  }, [roadmap]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const tasksDocRef = doc(db, 'users', user.uid, 'data', 'tasks');
     const unsubscribeTasks = onSnapshot(tasksDocRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().tasks) {
-        const loadedTasks = docSnap.data().tasks.map((task: any) => ({
-          ...task,
-          targetDate: task.targetDate.toDate ? task.targetDate.toDate() : new Date(task.targetDate),
-          startDate: task.startDate.toDate ? task.startDate.toDate() : new Date(task.startDate),
-        }));
+        const loadedTasks = docSnap.data().tasks.map((task: any) => {
+          const targetDate = task.targetDate?.toDate ? task.targetDate.toDate() : new Date(task.targetDate || new Date());
+          const startDate = task.startDate?.toDate ? task.startDate.toDate() : new Date(task.startDate || new Date());
+
+          if (isNaN(targetDate.getTime()) || isNaN(startDate.getTime())) {
+            console.error("Invalid task date found, falling back to current date.", task);
+            return { ...task, targetDate: new Date(), startDate: new Date() };
+          }
+
+          return { ...task, targetDate, startDate };
+        });
         setTasks(loadedTasks);
         if (!selectedTaskId && loadedTasks.length > 0) {
           setSelectedTaskId(loadedTasks[0].id);
         }
+      } else {
+        setTasks([]);
       }
       setLoading(false);
     });
@@ -88,7 +86,17 @@ const Index = () => {
     const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
     const unsubscribeRoadmap = onSnapshot(roadmapDocRef, (docSnap) => {
       if (docSnap.exists()) {
-        setRoadmap(docSnap.data());
+        const data = docSnap.data();
+        const startDate = data.startDate?.toDate ? data.startDate.toDate() : new Date(data.startDate || new Date());
+        
+        if (isNaN(startDate.getTime())) {
+            console.error("Invalid startDate in roadmap, falling back to current date.", data);
+            setRoadmap({ ...data, startDate: new Date() });
+        } else {
+            setRoadmap({ ...data, startDate: startDate });
+        }
+      } else {
+        setRoadmap(null);
       }
     });
 
@@ -120,14 +128,6 @@ const Index = () => {
     const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
     handleRoadmapUpdate(updatedRoadmap);
   };
-
-  const handleAssistantUpdate = (updatedTasks: any[]) => {
-     if (!user || !roadmap) return;
-     const updatedRoadmap = { ...roadmap, dailyTasks: updatedTasks };
-     setRoadmap(updatedRoadmap);
-     const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
-     setDoc(roadmapDocRef, updatedRoadmap, { merge: true });
-  }
 
   if (loading) {
     return (
@@ -191,7 +191,6 @@ const Index = () => {
             <DailyTaskCard roadmap={roadmap} selectedDay={selectedDay} onRoadmapUpdate={handleDailyTaskUpdate} currentDay={currentDay} />
             <AIAssistant
               currentRoadmap={roadmap}
-              onRoadmapUpdate={handleAssistantUpdate}
               hasIncompleteTasks={hasIncompleteTasks}
               allTasksCompleted={allTasksCompleted}
               currentDay={currentDay}
