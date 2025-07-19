@@ -32,7 +32,7 @@ const Index = () => {
     const calculateCurrentDay = (startDate: Date | undefined) => {
       if (startDate && !isNaN(startDate.getTime())) {
         const now = new Date();
-        const start = new Date(startDate);
+        const start = new Date(startDate); // Create a new object to avoid mutation
         start.setHours(0, 0, 0, 0);
         now.setHours(0, 0, 0, 0);
         const day = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
@@ -85,6 +85,10 @@ const Index = () => {
 
     const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
     const unsubscribeRoadmap = onSnapshot(roadmapDocRef, (docSnap) => {
+      // Ignore updates that are from local changes to prevent overwriting optimistic UI
+      if (docSnap.metadata.hasPendingWrites) {
+        return;
+      }
       if (docSnap.exists()) {
         const data = docSnap.data();
         const startDate = data.startDate?.toDate ? data.startDate.toDate() : new Date(data.startDate || new Date());
@@ -115,12 +119,16 @@ const Index = () => {
     const docRef = doc(db, 'users', user.uid, 'data', 'tasks');
     await setDoc(docRef, { tasks: updatedTasks }, { merge: true });
   };
-
-  const handleRoadmapUpdate = (newRoadmap: any) => {
+  
+  const handleRoadmapUpdate = async (newRoadmap: any) => {
     if (!user) return;
+    
+    // Optimistically update the UI
     setRoadmap(newRoadmap);
+
+    // Update firestore in the background
     const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
-    setDoc(roadmapDocRef, newRoadmap, { merge: true });
+    await setDoc(roadmapDocRef, newRoadmap, { merge: true });
   };
 
   const handleDailyTaskUpdate = (updatedDailyTasks: any[]) => {
@@ -128,7 +136,7 @@ const Index = () => {
     const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
     handleRoadmapUpdate(updatedRoadmap);
   };
-
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-2xl font-bold text-primary">
