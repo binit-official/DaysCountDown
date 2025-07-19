@@ -24,18 +24,27 @@ const difficultyColors = {
 export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: RoadmapProps) => {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const currentDayRef = useRef<HTMLLIElement>(null);
+  const hasAutoScrolled = useRef(false);
 
   useEffect(() => {
-    if (currentDayRef.current && scrollViewportRef.current) {
+    // This effect ensures that we only auto-scroll once when the component
+    // has fully loaded with the roadmap data.
+    if (roadmap && currentDayRef.current && scrollViewportRef.current && !hasAutoScrolled.current) {
       const viewport = scrollViewportRef.current;
       const element = currentDayRef.current;
-      const offsetTop = element.offsetTop;
-      viewport.scrollTo({
-        top: offsetTop - viewport.offsetTop,
-        behavior: 'smooth',
-      });
+      
+      const topPos = element.offsetTop - viewport.offsetTop;
+
+      // Use a timeout to make sure the DOM is fully painted before scrolling
+      setTimeout(() => {
+        viewport.scrollTo({
+          top: topPos,
+          behavior: 'smooth'
+        });
+        hasAutoScrolled.current = true;
+      }, 100);
     }
-  }, [currentDay, roadmap]);
+  }, [roadmap]); // Depend only on `roadmap` to trigger the initial scroll correctly.
 
   if (!roadmap || !roadmap.dailyTasks || roadmap.dailyTasks.length === 0) {
     return (
@@ -51,7 +60,7 @@ export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: Roadm
   return (
     <Card className="p-4 md:p-6 neon-border bg-card/90 backdrop-blur-sm animate-fade-in-up">
       <h3 className="text-2xl font-bold mb-6 text-center gradient-text">Your Mission Blueprint</h3>
-      <ScrollArea className="h-[400px] lg:h-[500px]" viewportRef={scrollViewportRef}>
+      <ScrollArea className="h-[400px] lg:h-[500px]" viewportRef={scrollViewportRef} scrollbarClassName="invisible">
         <div className="relative pl-6">
           {/* Vertical timeline bar */}
           <div className="absolute left-0 top-0 h-full w-0.5 bg-border/50" />

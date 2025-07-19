@@ -4,14 +4,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { Sparkles, Bot, User, CornerDownLeft } from 'lucide-react';
+import { Bot, User, CornerDownLeft, RefreshCw, BrainCircuit, Flame } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 
 interface AIAssistantProps {
   currentRoadmap: any | null;
   onRoadmapUpdate: (updatedTasks: any[]) => void;
   hasIncompleteTasks: boolean;
   allTasksCompleted: boolean;
+  currentDay: number;
+  isNewUser: boolean;
 }
 
 interface Message {
@@ -23,76 +26,67 @@ interface Message {
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTasks, allTasksCompleted }: AIAssistantProps) => {
+export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTasks, allTasksCompleted, currentDay, isNewUser }: AIAssistantProps) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [aiPersona, setAiPersona] = useState<'nyx' | 'general'>('nyx');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const initialMessageSent = useRef(false);
-
+  
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
 
-  useEffect(() => {
-    const generateInitialMessage = async () => {
-      if (!currentRoadmap || initialMessageSent.current) return;
-
-      let prompt = "";
-      if (allTasksCompleted) {
-        prompt = `
-          You are Nyx, an AI accountability coach with a dynamic, human-like personality. Your tone can be a mix of witty, tough, and encouraging. The user has just completed their entire roadmap for the goal: "${currentRoadmap.goal}".
-          Generate a unique, celebratory, and genuinely motivational message congratulating them. Avoid clichés. Make it sound like a real moment of victory.
-        `;
-      } else if (hasIncompleteTasks) {
-        const incompleteTasks = currentRoadmap.dailyTasks
-          .filter((task: any) => task.day < new Date().getDate() && !task.completed)
-          .map((task: any) => `Day ${task.day}: ${task.task}`)
-          .join('; ');
-        prompt = `
-          You are Nyx, an AI accountability coach with a dynamic, human-like personality. The user has logged in and has these incomplete tasks from previous days: "${incompleteTasks}".
-          Generate a unique, firm, but ultimately motivational message. Your tone should be a mix of disappointment and a challenge to do better. Don't always be rude; be creative and direct in a way that inspires action, not despair.
-        `;
-      } else {
-        // A general greeting for a user who is on track
-        prompt = `
-          You are Nyx, an AI accountability coach with a dynamic, human-like personality. The user has logged in and is on track with their goal: "${currentRoadmap.goal}".
-          Generate a unique, sharp, and witty greeting for the day. It could be a piece of tough love, a surprising compliment, or a curious question about their progress. Keep it fresh and unpredictable.
-        `;
-      }
-
-      if (prompt) {
-        initialMessageSent.current = true;
-        setLoading(true);
-        try {
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-          });
-          if (!response.ok) throw new Error('Failed to get a response from the AI.');
-          const data = await response.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            setMessages([{ id: Date.now(), sender: 'ai', text: text.trim() }]);
-          }
-        } catch (error: any) {
-          console.error("Failed to generate initial AI message:", error);
-          setMessages([{ id: Date.now(), sender: 'ai', text: "Nyx here. Let's get to work." }]);
-        } finally {
-          setLoading(false);
+  const generateInitialMessage = async () => {
+    let prompt = "";
+    if (aiPersona === 'nyx') {
+        const persona = "You are Nyx, an AI accountability coach. Your personality is sharp, witty, and direct—like a tough-love friend. You're encouraging but not cheesy. Your tone is conversational and straightforward. Avoid overly complex vocabulary and keep responses concise.";
+        if (isNewUser) {
+            prompt = `${persona} A new user just signed up. Generate a welcome message that instructs them to create their first mission in the 'Active Missions' panel on the left.`;
+        } else if (currentRoadmap) {
+            if (allTasksCompleted) prompt = `${persona} The user has completed their goal: "${currentRoadmap.goal}". Generate a unique, celebratory message.`;
+            else if (hasIncompleteTasks) prompt = `${persona} The user has incomplete tasks. Generate a firm but motivational message to get them back on track.`;
+            else prompt = `${persona} The user is on track with their goal: "${currentRoadmap.goal}". Generate a unique, witty greeting.`;
+        } else {
+            setMessages([{ id: Date.now(), sender: 'ai', text: "Nyx here. What's the mission?" }]);
+            return;
         }
-      }
-    };
+    } else {
+        prompt = "You are a helpful and friendly general-purpose AI assistant. Greet the user and ask how you can help them today.";
+    }
 
+    if (!prompt) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      });
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        setMessages([{ id: Date.now(), sender: 'ai', text: text.trim() }]);
+      }
+    } catch (error) {
+      console.error("Failed to generate initial message:", error);
+      setMessages([{ id: Date.now(), sender: 'ai', text: "AI is currently offline." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    setMessages([]);
     generateInitialMessage();
-  }, [hasIncompleteTasks, allTasksCompleted, currentRoadmap]);
+  }, [aiPersona, isNewUser]);
 
 
   const handleSendMessage = async () => {
-    if (!input.trim() || !currentRoadmap) return;
+    if (!input.trim()) return;
 
     const userMessage: Message = { id: Date.now(), sender: 'user', text: input };
     const newMessages = [...messages, userMessage];
@@ -101,52 +95,66 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
     setLoading(true);
 
     const conversationHistory = newMessages.map(msg => `[${msg.sender.toUpperCase()}]: ${msg.text}`).join('\n');
-
-    const prompt = `
-      You are Nyx, an AI accountability coach with a dynamic, human-like personality. Your tone is a mix of witty, tough, and encouraging, and you should avoid being repetitive. You have full context of the user's progress.
-
-      **User's Goal:** "${currentRoadmap.goal}"
-      **Total Days in Plan:** ${currentRoadmap.days}
-      **Full Roadmap:** ${JSON.stringify(currentRoadmap.dailyTasks)}
-      
-      **Conversation History:**
+    
+    const nyxPrompt = `
+      You are Nyx, an AI accountability coach with a sharp, witty, and direct personality. The user's current goal is: "${currentRoadmap?.goal || 'Not set'}".
+      If the message is about their goal or productivity, provide tough-love advice. If it's a general question, you can answer it but with your unique, slightly impatient and sarcastic personality.
+      If you propose a new plan, YOU MUST format your response as: [Conversational text] ---JSON--- [A valid JSON array of updated tasks]. There should be NO text after the JSON block.
+      Conversation History:
       ${conversationHistory}
-
-      **Your Task:**
-      Based on the full context and conversation history, provide a human-like response as Nyx. Your response should be insightful and not just a generic reply. If the user seems stuck or is making excuses, you can propose a new plan by formatting your response as: [Conversational text] ---JSON--- [JSON array of tasks]
     `;
 
+    const generalPrompt = `
+      You are a standard, helpful, and friendly AI assistant.
+      The user is using a productivity application, but your role in this mode is to be a general assistant.
+      Answer the user's question directly and clearly based on the conversation history.
+      Conversation History:
+      ${conversationHistory}
+    `;
+
+    const prompt = aiPersona === 'nyx' ? nyxPrompt : generalPrompt;
+
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      });
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        });
 
-      if (!response.ok) throw new Error((await response.json()).error?.message || 'API request failed');
+        if (!response.ok) throw new Error((await response.json()).error?.message || 'API request failed');
+        const data = await response.json();
+        const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawContent) throw new Error('Invalid API response.');
 
-      const data = await response.json();
-      const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!rawContent) throw new Error('Invalid API response.');
+        const parts = rawContent.split('---JSON---');
+        const conversationalText = parts[0].trim();
+        let jsonText = parts.length > 1 ? parts[1].trim() : null;
 
-      const parts = rawContent.split('---JSON---');
-      const conversationalText = parts[0].trim();
-      const jsonText = parts.length > 1 ? parts[1].replace(/```json\n?|```/g, '').trim() : null;
+        const aiMessage: Message = { id: Date.now() + 1, sender: 'ai', text: conversationalText };
 
-      const aiMessage: Message = { id: Date.now() + 1, sender: 'ai', text: conversationalText };
-
-      if (jsonText) {
-        aiMessage.proposedPlan = JSON.parse(jsonText);
-      }
-
-      setMessages(prev => [...prev, aiMessage]);
-
+        if (jsonText && aiPersona === 'nyx') {
+            const jsonMatch = jsonText.match(/(\[.*\]|\{.*\})/s);
+            if (jsonMatch) {
+                aiMessage.proposedPlan = JSON.parse(jsonMatch[0]);
+            }
+        }
+        
+        setMessages(prev => [...prev, aiMessage]);
     } catch (err: any) {
-      const errorMessage: Message = { id: Date.now() + 1, sender: 'ai', text: `Error: ${err.message}. Try again.` };
-      setMessages(prev => [...prev, errorMessage]);
+        let displayError = `Sorry, I hit a snag. Try again.`;
+        if (typeof err.message === 'string' && err.message.toLowerCase().includes('quota')) {
+            displayError = "It seems the AI is a bit popular right now and has hit its usage limit. Please try again later."
+        }
+        const errorMessage: Message = { id: Date.now() + 1, sender: 'ai', text: displayError };
+        setMessages(prev => [...prev, errorMessage]);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    generateInitialMessage();
   };
 
   const handleAcceptPlan = (plan: any[]) => {
@@ -160,16 +168,24 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
 
   return (
     <Card className="flex flex-col h-[380px] neon-border bg-card/90 backdrop-blur-sm border-secondary/50">
-      <div className="flex items-center p-3 border-b border-secondary/20 flex-shrink-0">
-        <Bot className="w-5 h-5 mr-2 text-secondary animate-pulse" />
-        <h3 className="text-lg font-bold neon-text text-secondary">NYX</h3>
+      <div className="flex items-center justify-between p-3 border-b border-secondary/20 flex-shrink-0">
+        <ToggleGroup type="single" value={aiPersona} onValueChange={(value: 'nyx' | 'general') => value && setAiPersona(value)} className="justify-start">
+            <ToggleGroupItem value="nyx" aria-label="Switch to Nyx" className="flex gap-2 data-[state=on]:bg-secondary/20 data-[state=on]:text-secondary">
+                <Flame className="w-4 h-4" /> Nyx
+            </ToggleGroupItem>
+            <ToggleGroupItem value="general" aria-label="Switch to General AI" className="flex gap-2 data-[state=on]:bg-primary/20 data-[state=on]:text-primary">
+                <BrainCircuit className="w-4 h-4" /> General
+            </ToggleGroupItem>
+        </ToggleGroup>
+        <Button variant="ghost" size="icon" onClick={handleNewChat} className="h-7 w-7">
+            <RefreshCw className="w-4 h-4" />
+        </Button>
       </div>
-      <ScrollArea className="flex-1" ref={scrollAreaRef}>
+      <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
         <div className="p-3 space-y-3">
-          {messages.length === 0 && (
+          {messages.length === 0 && !loading && (
             <div className="text-center text-muted-foreground py-12 px-4">
-              <p className="font-bold">Feeling stuck?</p>
-              <p className="text-sm">Tell Nyx.</p>
+              <p className="font-bold">Start a new conversation.</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -177,7 +193,7 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
               {msg.sender === 'ai' && <Bot className="w-5 h-5 text-secondary flex-shrink-0 mt-1" />}
               <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-primary/20' : 'bg-secondary/10'}`}>
                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                {msg.proposedPlan && (
+                {msg.proposedPlan && aiPersona === 'nyx' && (
                   <div className="mt-2 pt-2 border-t border-secondary/20 space-y-1">
                     <p className="text-xs font-bold text-secondary">PROPOSED PLAN:</p>
                     <div className="flex gap-2">
@@ -202,13 +218,13 @@ export const AIAssistant = ({ currentRoadmap, onRoadmapUpdate, hasIncompleteTask
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={!currentRoadmap ? "Generate a roadmap first..." : "Type here..."}
+            placeholder={isNewUser ? "Create a mission to begin..." : `Chat with ${aiPersona === 'nyx' ? 'Nyx' : 'General AI'}...`}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
             className="pr-10 bg-background/50 text-sm"
             rows={1}
-            disabled={!currentRoadmap || loading}
+            disabled={isNewUser || loading}
           />
-          <Button size="icon" onClick={handleSendMessage} disabled={!currentRoadmap || loading} className="absolute right-1.5 bottom-1 h-7 w-7"><CornerDownLeft className="h-4 w-4" /></Button>
+          <Button size="icon" onClick={handleSendMessage} disabled={isNewUser || loading} className="absolute right-1.5 bottom-1 h-7 w-7"><CornerDownLeft className="h-4 w-4" /></Button>
         </div>
       </div>
     </Card>

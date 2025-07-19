@@ -53,15 +53,16 @@ export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDa
         <span className="text-sm text-muted-foreground">{format(selectedDate, 'MMMM d, yyyy')}</span>
       </div>
 
-      {previousIncompleteTasks.length > 0 && selectedDay === currentDay && (
+      {previousIncompleteTasks.length > 0 && (
         <div className="mb-4 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive">
           <div className="flex items-center">
             <AlertTriangle className="w-5 h-5 mr-2" />
             <h4 className="font-bold">INCOMPLETE TASKS!</h4>
           </div>
-          <ul className="list-disc list-inside mt-2 text-sm">
+          <p className="text-xs mt-1">You have unfinished missions from the following days:</p>
+          <ul className="list-disc list-inside mt-2 text-sm font-semibold">
             {previousIncompleteTasks.map((task: any) => (
-              <li key={task.day}>Day {task.day}: {task.task}</li>
+              <li key={task.day}>Day {task.day}</li>
             ))}
           </ul>
         </div>

@@ -44,7 +44,9 @@ const Index = () => {
     if (roadmap?.dailyTasks) {
       const day = calculateCurrentDay();
       setCurrentDay(day);
-      setSelectedDay(day);
+      if (selectedDay === 1) { // Only set selected day on initial load
+        setSelectedDay(day);
+      }
 
       const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
       setHasIncompleteTasks(incomplete);
@@ -62,7 +64,7 @@ const Index = () => {
     }, 60000);
 
     return () => clearInterval(interval);
-  }, [roadmap, currentDay]);
+  }, [roadmap, currentDay, selectedDay]);
 
   useEffect(() => {
     if (!user) return;
@@ -97,6 +99,7 @@ const Index = () => {
   }, [user, selectedTaskId]);
 
   const selectedTask = tasks.find((task) => task.id === selectedTaskId) || null;
+  const isNewUser = tasks.length === 0 && !loading;
 
   const handleTasksChange = async (updatedTasks: Task[]) => {
     if (!user) return;
@@ -160,12 +163,12 @@ const Index = () => {
             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
               <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} />
             </Card>
-            <AIPlanner onRoadmapChange={handleRoadmapUpdate} />
+            <AIPlanner onRoadmapChange={handleRoadmapUpdate} disabled={isNewUser} user={user} />
             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm border-accent/50">
               <h3 className="text-lg font-black neon-text mb-4">HARSH TRUTH</h3>
               <div className="space-y-3">
                 <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Active Missions</span><span className="font-black text-primary text-lg">{tasks.length}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Days Left</span><span className="font-black text-accent text-lg">{selectedTask ? Math.max(0, Math.floor((selectedTask.targetDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0}</span></div>
+                <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Days Left</span><span className="font-black text-accent text-lg">{selectedTask ? Math.max(0, Math.ceil((selectedTask.targetDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0}</span></div>
                 <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Extreme Tasks</span><span className="font-black text-red-500 text-lg animate-pulse">{tasks.filter(task => task.priority === 'extreme').length}</span></div>
               </div>
             </Card>
@@ -178,6 +181,7 @@ const Index = () => {
                 <div className="text-center py-20">
                   <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-red-500 animate-pulse" />
                   <h3 className="text-3xl font-black mb-2 text-red-500">NO MISSION SELECTED</h3>
+                  {isNewUser && <p className="text-muted-foreground">Follow the guide in the bottom-right chat to create one.</p>}
                 </div>
               )}
             </Card>
@@ -190,6 +194,8 @@ const Index = () => {
               onRoadmapUpdate={handleAssistantUpdate}
               hasIncompleteTasks={hasIncompleteTasks}
               allTasksCompleted={allTasksCompleted}
+              currentDay={currentDay}
+              isNewUser={isNewUser}
             />
           </div>
         </div>

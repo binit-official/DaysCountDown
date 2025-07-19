@@ -1,6 +1,6 @@
 // src/components/AIPlanner.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Zap } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { User } from 'firebase/auth';
 
 interface DailyTask {
   day: number;
@@ -25,25 +27,17 @@ interface Roadmap {
 
 interface AIPlannerProps {
   onRoadmapChange: (roadmap: Roadmap) => void;
+  disabled?: boolean;
+  user: User | null;
 }
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
+const AIPlanner = ({ onRoadmapChange, disabled = false, user }: AIPlannerProps) => {
   const [goal, setGoal] = useState('');
   const [days, setDays] = useState(45);
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let uid = localStorage.getItem('userId');
-    if (!uid) {
-      uid = 'user-' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('userId', uid);
-    }
-    setUserId(uid);
-  }, []);
 
   const generateRoadmap = async () => {
     if (!goal || !days) {
@@ -54,20 +48,25 @@ const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
         setError("Gemini API key is not configured.");
         return;
     }
+    if (!user) {
+        setError("You must be logged in to create a plan.");
+        return;
+    }
     setLoading(true);
     setError(null);
 
     const prompt = `
+      You must create a detailed roadmap for the exact number of days specified. Do not change the number of days.
       Create a detailed ${days}-day roadmap to achieve the goal: "${goal}".
       For each day, provide a detailed, multi-part task using semicolons as a delimiter. For example: "Watch 2 lectures on React Hooks; build 1 small component; read 1 chapter of the documentation."
       Also, for each day, provide a difficulty rating from one of these four options: 'Easy', 'Medium', 'Hard', 'Challenge'.
 
-      Respond ONLY with a valid JSON array of objects. Each object must have three fields:
+      Respond ONLY with a valid JSON array of objects. The array must contain exactly ${days} objects. Each object must have three fields:
       1. "day" (number)
       2. "task" (string, the detailed multi-part task)
       3. "difficulty" (string, one of 'Easy', 'Medium', 'Hard', 'Challenge')
 
-      Example: [{"day": 1, "task": "Task A; Task B; Task C", "difficulty": "Medium"}]
+      Example for a 2-day plan: [{"day": 1, "task": "Task A; Task B", "difficulty": "Easy"}, {"day": 2, "task": "Task C; Task D", "difficulty": "Medium"}]
     `;
 
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
@@ -104,10 +103,10 @@ const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
 
       onRoadmapChange(newRoadmap);
 
-      if (userId) {
-        const docRef = doc(db, 'roadmaps', userId);
-        await setDoc(docRef, newRoadmap);
-      }
+      // Save to user-specific document in Firestore
+      const docRef = doc(db, 'users', user.uid, 'data', 'roadmap');
+      await setDoc(docRef, newRoadmap, { merge: true });
+
     } catch (error: any) {
       console.error('Error generating roadmap:', error);
       setError(error.message || 'Failed to generate roadmap.');
@@ -117,7 +116,7 @@ const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
   };
 
   return (
-    <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
+    <Card className={cn("p-4 neon-border bg-card/90 backdrop-blur-sm", disabled && "opacity-50 pointer-events-none")}>
         <h3 className="text-lg font-bold mb-4 flex items-center">
             <Zap className="w-5 h-5 mr-2 text-primary" />
             AI Mission Planner
@@ -130,8 +129,9 @@ const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
                     type="text"
                     value={goal}
                     onChange={(e) => setGoal(e.target.value)}
-                    placeholder="e.g., Master React in 45 Days"
+                    placeholder="Create an active mission first..."
                     className="mt-1 neon-border bg-background/50"
+                    disabled={disabled || loading}
                 />
             </div>
             <div>
@@ -144,9 +144,10 @@ const AIPlanner = ({ onRoadmapChange }: AIPlannerProps) => {
                     className="mt-1 neon-border bg-background/50"
                     min={1}
                     max={365}
+                    disabled={disabled || loading}
                 />
             </div>
-            <Button onClick={generateRoadmap} disabled={loading} className="w-full cyberpunk-button">
+            <Button onClick={generateRoadmap} disabled={disabled || loading} className="w-full cyberpunk-button">
                 {loading ? 'Generating...' : 'Generate New Plan'}
             </Button>
             {error && <p className="mt-2 text-red-500 text-sm font-semibold">{error}</p>}

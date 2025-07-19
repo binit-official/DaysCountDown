@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 
 export interface Task {
   id: string;
@@ -40,6 +41,8 @@ const priorityClasses = {
 export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask }: TaskManagerProps) => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [deadlineType, setDeadlineType] = useState<'date' | 'days'>('date');
+  const [numberOfDays, setNumberOfDays] = useState('30');
   const [formData, setFormData] = useState({
     title: '',
     targetDate: '',
@@ -49,12 +52,26 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.targetDate) return;
+
+    let targetDateValue: Date;
+
+    if (deadlineType === 'date') {
+      if (!formData.targetDate) return;
+      targetDateValue = new Date(formData.targetDate);
+    } else {
+      const days = parseInt(numberOfDays, 10);
+      if (!days || days <= 0) return;
+      targetDateValue = new Date();
+      targetDateValue.setDate(targetDateValue.getDate() + days);
+    }
+    
+    // Adjust date to be at the end of the day to ensure a full day countdown
+    targetDateValue.setHours(23, 59, 59, 999);
     
     const taskData = {
       id: editingTask?.id || Date.now().toString(),
       title: formData.title,
-      targetDate: new Date(formData.targetDate),
+      targetDate: targetDateValue,
       startDate: editingTask?.startDate || new Date(),
       category: formData.category || 'General',
       priority: formData.priority
@@ -70,12 +87,15 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
     }
 
     setFormData({ title: '', targetDate: '', category: '', priority: 'high' });
+    setNumberOfDays('30');
+    setDeadlineType('date');
     setIsAddDialogOpen(false);
     setEditingTask(null);
   };
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
+    setDeadlineType('date');
     setFormData({
       title: task.title,
       targetDate: task.targetDate.toISOString().split('T')[0],
@@ -98,9 +118,10 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
   const getTimeLeft = (targetDate: Date) => {
     const now = new Date();
     const difference = targetDate.getTime() - now.getTime();
-    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+    const days = Math.ceil(difference / (1000 * 60 * 60 * 24));
     
-    if (days > 0) return `${days} days left`;
+    if (days > 1) return `${days} days left`;
+    if (days === 1) return '1 day left';
     if (days === 0) return 'Today!';
     return `${Math.abs(days)} days overdue`;
   };
@@ -111,7 +132,7 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
         <h3 className="text-xl font-bold neon-text">Active Missions</h3>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="cyberpunk-button" onClick={() => { setEditingTask(null); setFormData({ title: '', targetDate: '', category: '', priority: 'high' }); }}>
+            <Button className="cyberpunk-button" onClick={() => { setEditingTask(null); setFormData({ title: '', targetDate: '', category: '', priority: 'high' }); setDeadlineType('date'); setNumberOfDays('30'); }}>
               <Plus className="w-4 h-4 mr-2" /> New
             </Button>
           </DialogTrigger>
@@ -119,7 +140,20 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
             <DialogHeader><DialogTitle className="neon-text">{editingTask ? 'Edit Mission' : 'Create New Mission'}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div><Label htmlFor="title" className="text-foreground">Title</Label><Input id="title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="What will you conquer?" className="neon-border bg-background/50" required /></div>
-              <div><Label htmlFor="targetDate" className="text-foreground">Deadline</Label><Input id="targetDate" type="date" value={formData.targetDate} onChange={(e) => setFormData({ ...formData, targetDate: e.target.value })} className="neon-border bg-background/50" required /></div>
+              
+              <div>
+                <Label className="text-foreground">Deadline</Label>
+                <ToggleGroup type="single" value={deadlineType} onValueChange={(value) => value && setDeadlineType(value as 'date' | 'days')} className="grid grid-cols-2 mt-2">
+                  <ToggleGroupItem value="date">By Date</ToggleGroupItem>
+                  <ToggleGroupItem value="days">In Days</ToggleGroupItem>
+                </ToggleGroup>
+                {deadlineType === 'date' ? (
+                  <Input id="targetDate" type="date" value={formData.targetDate} onChange={(e) => setFormData({ ...formData, targetDate: e.target.value })} className="neon-border bg-background/50 mt-2" required={deadlineType === 'date'} />
+                ) : (
+                  <Input id="numberOfDays" type="number" value={numberOfDays} onChange={(e) => setNumberOfDays(e.target.value)} placeholder="e.g., 30" className="neon-border bg-background/50 mt-2" required={deadlineType === 'days'} min="1" />
+                )}
+              </div>
+
               <div><Label htmlFor="category" className="text-foreground">Category</Label><Input id="category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} placeholder="e.g., Fitness, Business" className="neon-border bg-background/50" /></div>
               <div>
                 <Label htmlFor="priority" className="text-foreground">Priority</Label>
