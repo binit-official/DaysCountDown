@@ -44,32 +44,35 @@ export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDa
   );
 
   const selectedDate = new Date(startDate);
-  selectedDate.setDate(startDate.getDate() + selectedDay - 1);
+  if (!isNaN(selectedDate.getTime())) {
+    selectedDate.setDate(startDate.getDate() + selectedDay - 1);
+  }
 
   return (
     <Card className="p-4 md:p-6 neon-border bg-card/90 backdrop-blur-sm border-primary/50">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-bold text-primary neon-text">Mission for Day {selectedDay}</h3>
-        <span className="text-sm text-muted-foreground">{format(selectedDate, 'MMMM d, yyyy')}</span>
+        <span className="text-sm text-muted-foreground">{!isNaN(selectedDate.getTime()) ? format(selectedDate, 'MMMM d, yyyy') : 'Invalid Date'}</span>
       </div>
 
-      {previousIncompleteTasks.length > 0 && (
+      {previousIncompleteTasks.length > 0 && selectedDay >= currentDay && (
         <div className="mb-4 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive">
           <div className="flex items-center">
             <AlertTriangle className="w-5 h-5 mr-2" />
             <h4 className="font-bold">INCOMPLETE TASKS!</h4>
           </div>
-          <p className="text-xs mt-1">You have unfinished missions from the following days:</p>
-          <ul className="list-disc list-inside mt-2 text-sm font-semibold">
-            {previousIncompleteTasks.map((task: any) => (
-              <li key={task.day}>Day {task.day}</li>
-            ))}
-          </ul>
+          <p className="text-xs mt-1">You have unfinished missions from previous days.</p>
         </div>
       )}
 
       {selectedDayTask && subTasks.length > 0 ? (
         <div className="space-y-3">
+          {selectedDayTask.completed && (
+            <div className="flex items-center space-x-2 text-green-400 p-2 bg-green-500/10 rounded-md">
+              <CheckCircle className="w-5 h-5" />
+              <p className="font-bold text-sm">Day Complete!</p>
+            </div>
+          )}
           {subTasks.map((subTask: string, index: number) => (
             <div key={index} className="flex items-center space-x-3">
               <Checkbox
@@ -92,7 +95,7 @@ export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDa
       ) : (
         <div className="flex items-center space-x-3 text-muted-foreground">
            <CheckCircle className="w-5 h-5 text-green-500" />
-          <p>No task for today.</p>
+          <p>No tasks scheduled for this day.</p>
         </div>
       )}
     </Card>
