@@ -123,7 +123,7 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
         const data = await response.json();
         const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!rawContent) throw new Error('Invalid API response.');
-
+        
         const aiMessage: Message = { id: Date.now() + 1, sender: 'ai', text: rawContent.trim() };
         
         setMessages(prev => [...prev, aiMessage]);
@@ -193,7 +193,7 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
             rows={1}
             disabled={isNewUser || loading}
           />
-          <Button size="icon" onClick={handleSendMessage} disabled={isNewUser || loading} className="absolute right-1.5 bottom-1 h-7 w-7"><CornerDownLeft className="h-4 w-4" /></Button>
+          <Button size="icon" onClick={handleSendMessage} disabled={isNewUser || loading} className="absolute right-1.5 bottom-1 h-7 w-7"><CornerDownLeft className="w-4 w-4" /></Button>
         </div>
       </div>
     </Card>

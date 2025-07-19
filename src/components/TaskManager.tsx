@@ -29,6 +29,7 @@ interface TaskManagerProps {
   onTasksChange: (tasks: Task[]) => void;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string | null) => void;
+  onArchive: (task: Task) => void;
 }
 
 const priorityClasses = {
@@ -65,7 +66,6 @@ export const TaskManager = ({ tasks, onTasksChange, selectedTaskId, onSelectTask
       targetDateValue.setDate(targetDateValue.getDate() + days);
     }
     
-    // Adjust date to be at the end of the day to ensure a full day countdown
     targetDateValue.setHours(23, 59, 59, 999);
     
     const taskData = {

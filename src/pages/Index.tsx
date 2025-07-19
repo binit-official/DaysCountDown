@@ -13,9 +13,11 @@ import { Logo } from '@/components/Logo';
 import { UserNav } from '@/components/UserNav';
 import { Card } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { AlertTriangle, Zap, Flame, Target } from 'lucide-react';
 import { Footer } from '@/components/Footer';
+import { isToday, isYesterday } from 'date-fns';
+import { toast } from 'sonner';
 
 const Index = () => {
   const { user } = useAuth();
@@ -32,7 +34,7 @@ const Index = () => {
     const calculateCurrentDay = (startDate: Date | undefined) => {
       if (startDate && !isNaN(startDate.getTime())) {
         const now = new Date();
-        const start = new Date(startDate); // Create a new object to avoid mutation
+        const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
         now.setHours(0, 0, 0, 0);
         const day = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
@@ -44,7 +46,8 @@ const Index = () => {
     if (roadmap?.dailyTasks && roadmap.startDate) {
       const day = calculateCurrentDay(roadmap.startDate);
       setCurrentDay(day);
-      
+      setSelectedDay(day);
+
       const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
       setHasIncompleteTasks(incomplete);
 
@@ -62,17 +65,11 @@ const Index = () => {
     const tasksDocRef = doc(db, 'users', user.uid, 'data', 'tasks');
     const unsubscribeTasks = onSnapshot(tasksDocRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().tasks) {
-        const loadedTasks = docSnap.data().tasks.map((task: any) => {
-          const targetDate = task.targetDate?.toDate ? task.targetDate.toDate() : new Date(task.targetDate || new Date());
-          const startDate = task.startDate?.toDate ? task.startDate.toDate() : new Date(task.startDate || new Date());
-
-          if (isNaN(targetDate.getTime()) || isNaN(startDate.getTime())) {
-            console.error("Invalid task date found, falling back to current date.", task);
-            return { ...task, targetDate: new Date(), startDate: new Date() };
-          }
-
-          return { ...task, targetDate, startDate };
-        });
+        const loadedTasks = docSnap.data().tasks.map((task: any) => ({
+          ...task,
+          targetDate: task.targetDate.toDate(),
+          startDate: task.startDate.toDate(),
+        }));
         setTasks(loadedTasks);
         if (!selectedTaskId && loadedTasks.length > 0) {
           setSelectedTaskId(loadedTasks[0].id);
@@ -85,28 +82,30 @@ const Index = () => {
 
     const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
     const unsubscribeRoadmap = onSnapshot(roadmapDocRef, (docSnap) => {
-      // Ignore updates that are from local changes to prevent overwriting optimistic UI
-      if (docSnap.metadata.hasPendingWrites) {
-        return;
-      }
+      if (docSnap.metadata.hasPendingWrites) return;
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const startDate = data.startDate?.toDate ? data.startDate.toDate() : new Date(data.startDate || new Date());
-        
-        if (isNaN(startDate.getTime())) {
-            console.error("Invalid startDate in roadmap, falling back to current date.", data);
-            setRoadmap({ ...data, startDate: new Date() });
-        } else {
-            setRoadmap({ ...data, startDate: startDate });
-        }
+        setRoadmap({ ...data, startDate: data.startDate.toDate() });
       } else {
         setRoadmap(null);
       }
     });
 
+    const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+    const unsubscribeStats = onSnapshot(statsDocRef, async (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const lastCompleted = data.lastCompleted?.toDate();
+            if (lastCompleted && !isToday(lastCompleted) && !isYesterday(lastCompleted)) {
+                await updateDoc(statsDocRef, { streak: 0 });
+            }
+        }
+    });
+
     return () => {
       unsubscribeTasks();
       unsubscribeRoadmap();
+      unsubscribeStats();
     };
   }, [user, selectedTaskId]);
 
@@ -119,24 +118,86 @@ const Index = () => {
     const docRef = doc(db, 'users', user.uid, 'data', 'tasks');
     await setDoc(docRef, { tasks: updatedTasks }, { merge: true });
   };
-  
-  const handleRoadmapUpdate = async (newRoadmap: any) => {
+
+  const handleRoadmapUpdate = (newRoadmap: any) => {
     if (!user) return;
-    
-    // Optimistically update the UI
     setRoadmap(newRoadmap);
-
-    // Update firestore in the background
     const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
-    await setDoc(roadmapDocRef, newRoadmap, { merge: true });
+    setDoc(roadmapDocRef, newRoadmap, { merge: true });
   };
 
-  const handleDailyTaskUpdate = (updatedDailyTasks: any[]) => {
-    if (!user || !roadmap) return;
-    const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
-    handleRoadmapUpdate(updatedRoadmap);
+  const checkStreaksAndAchievements = async () => {
+    if (!user) return;
+    const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+    const docSnap = await getDoc(statsDocRef);
+    const stats = docSnap.exists() ? docSnap.data() : { streak: 0, lastCompleted: null, unlockedAchievements: [] };
+
+    const lastCompletedDate = stats.lastCompleted?.toDate();
+
+    if (lastCompletedDate && isToday(lastCompletedDate)) {
+      return;
+    }
+
+    const newStreak = (lastCompletedDate && isYesterday(lastCompletedDate))
+      ? (stats.streak || 0) + 1
+      : 1;
+
+    const newAchievements = [...(stats.unlockedAchievements || [])];
+    if (newStreak >= 3 && !newAchievements.includes('streak_3')) newAchievements.push('streak_3');
+    if (newStreak >= 7 && !newAchievements.includes('streak_7')) newAchievements.push('streak_7');
+
+    const newStats = {
+      ...stats,
+      streak: newStreak,
+      lastCompleted: new Date(),
+      unlockedAchievements: newAchievements
+    };
+
+    await setDoc(statsDocRef, newStats, { merge: true });
+    toast.success(`Streak extended to ${newStreak} days!`);
   };
-  
+
+  const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
+    if (!user || !roadmap) return;
+    
+    const newlyCompletedTask = updatedDailyTasks.find(t => {
+      const originalTask = roadmap.dailyTasks.find((ot: any) => ot.day === t.day);
+      return t.day === currentDay && t.completed && (!originalTask || !originalTask.completed);
+    });
+
+    const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
+    setRoadmap(updatedRoadmap);
+
+    if (newlyCompletedTask) {
+      await checkStreaksAndAchievements();
+    }
+    
+    const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
+    await setDoc(roadmapDocRef, updatedRoadmap, { merge: true });
+  };
+
+  const handleArchiveMission = async (taskToArchive: Task) => {
+    if (!user) return;
+    const updatedTasks = tasks.filter(t => t.id !== taskToArchive.id);
+    handleTasksChange(updatedTasks);
+
+    const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+    const docSnap = await getDoc(statsDocRef);
+    const stats = docSnap.exists() ? docSnap.data() : { completedMissions: 0, archivedTasks: [], unlockedAchievements: [] };
+
+    const newCompletedCount = (stats.completedMissions || 0) + 1;
+    stats.completedMissions = newCompletedCount;
+    stats.archivedTasks = [...(stats.archivedTasks || []), taskToArchive];
+
+    if (newCompletedCount >= 1) stats.unlockedAchievements.push('mission_1');
+    if (newCompletedCount >= 5) stats.unlockedAchievements.push('mission_5');
+    if (taskToArchive.priority === 'extreme') stats.unlockedAchievements.push('extreme_1');
+
+    await setDoc(statsDocRef, { ...stats, unlockedAchievements: [...new Set(stats.unlockedAchievements)] }, { merge: true });
+    
+    toast.success(`Mission "${taskToArchive.title}" archived!`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-2xl font-bold text-primary">
@@ -169,22 +230,14 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-3 space-y-6">
             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
-              <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} />
+              <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} onArchive={handleArchiveMission} />
             </Card>
             <AIPlanner onRoadmapChange={handleRoadmapUpdate} disabled={isNewUser} user={user} />
-            <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm border-accent/50">
-              <h3 className="text-lg font-black neon-text mb-4">HARSH TRUTH</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Active Missions</span><span className="font-black text-primary text-lg">{tasks.length}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Days Left</span><span className="font-black text-accent text-lg">{selectedTask ? Math.max(0, Math.ceil((selectedTask.targetDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0}</span></div>
-                <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground font-semibold">Extreme Tasks</span><span className="font-black text-red-500 text-lg animate-pulse">{tasks.filter(task => task.priority === 'extreme').length}</span></div>
-              </div>
-            </Card>
           </div>
           <div className="lg:col-span-6 space-y-6">
             <Card className="p-4 md:p-8 neon-border bg-card/90 backdrop-blur-sm">
               {selectedTask ? (
-                <CountdownTimer key={selectedTask.id} targetDate={selectedTask.targetDate} startDate={selectedTask.startDate} title={selectedTask.title} />
+                <CountdownTimer key={selectedTask.id} targetDate={selectedTask.targetDate} startDate={selectedTask.startDate} title={selectedTask.title} onComplete={() => handleArchiveMission(selectedTask)} />
               ) : (
                 <div className="text-center py-20">
                   <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-red-500 animate-pulse" />
