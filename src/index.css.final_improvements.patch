@@ -1,0 +1,365 @@
+--background-start: 260 90% 12%;
+    --background-end: 280 90% 8%;
+    --foreground: 280 30% 95%;
+    --card-background: 260 90% 15%;
+    --card-foreground: 280 30% 90%;
+    --popover-background: 260 90% 12%;
+    --popover-foreground: 280 30% 95%;
+    --primary: 180 100% 60%; /* Neon Aqua */
+    --primary-foreground: 260 90% 10%;
+    --secondary: 290 95% 70%; /* Electric Violet */
+    --secondary-foreground: 260 90% 10%;
+    --muted: 260 50% 20%;
+    --muted-foreground: 260 50% 60%;
+    --accent: 340 90% 65%; /* Hot Pink */
+    --accent-foreground: 260 90% 10%;
+    --highlight: 320 100% 70%;
+    --shadow-color: 260 90% 5%;
+    --destructive: 0 85% 65%;
+    --destructive-foreground: 280 30% 95%;
+    --border: 260 50% 20%;
+    --input: 260 50% 20%;
+    --ring: 180 100% 60%;
+    --radius: 0.5rem;
+  }
+=======
+  :root, .cyberpunk {
+    --background-start: 265 85% 15%;
+    --background-end: 285 90% 10%;
+    --foreground: 280 35% 95%;
+    --card-background: 265 85% 20%;
+    --card-foreground: 280 35% 90%;
+    --popover-background: 265 85% 18%;
+    --popover-foreground: 280 35% 95%;
+    --primary: 180 100% 70%; /* Neon Aqua */
+    --primary-foreground: 260 90% 15%;
+    --secondary: 300 90% 75%; /* Electric Violet */
+    --secondary-foreground: 260 90% 15%;
+    --muted: 260 50% 25%;
+    --muted-foreground: 260 50% 65%;
+    --accent: 340 90% 75%; /* Hot Pink */
+    --accent-foreground: 260 90% 15%;
+    --highlight: 320 100% 80%;
+    --shadow-color: 270 90% 10%;
+    --destructive: 0 85% 70%;
+    --destructive-foreground: 280 35% 95%;
+    --border: 270 50% 25%;
+    --input: 270 50% 25%;
+    --ring: 180 100% 65%;
+    --radius: 0.5rem;
+  }
+```
+
+```
+<<<<<<< SEARCH
+  .solaris {
+    --background-start: 40 100% 97%;
+    --background-end: 40 100% 90%;
+    --foreground: 40 90% 20%;
+    --card-background: 40 100% 98%;
+    --card-foreground: 40 90% 20%;
+    --popover-background: 40 100% 98%;
+    --popover-foreground: 40 90% 20%;
+    --primary: 35 100% 55%; /* Bright Orange */
+    --primary-foreground: 40 100% 98%;
+    --secondary: 50 90% 65%; /* Golden Yellow */
+    --secondary-foreground: 40 90% 20%;
+    --muted: 40 90% 85%;
+    --muted-foreground: 40 90% 40%;
+    --accent: 15 100% 60%; /* Warm Red */
+    --accent-foreground: 40 90% 20%;
+    --highlight: 45 100% 70%;
+    --shadow-color: 40 90% 15%;
+    --destructive: 0 90% 55%;
+    --destructive-foreground: 40 100% 98%;
+    --border: 40 90% 88%;
+    --input: 40 90% 88%;
+    --ring: 35 100% 55%;
+  }
+=======
+  .solaris {
+    --background-start: 45 100% 98%;
+    --background-end: 45 100% 92%;
+    --foreground: 40 90% 25%;
+    --card-background: 45 100% 95%;
+    --card-foreground: 40 90% 25%;
+    --popover-background: 45 100% 93%;
+    --popover-foreground: 40 90% 25%;
+    --primary: 35 100% 60%; /* Bright Orange */
+    --primary-foreground: 45 100% 95%;
+    --secondary: 50 90% 70%; /* Golden Yellow */
+    --secondary-foreground: 40 90% 25%;
+    --muted: 40 90% 88%;
+    --muted-foreground: 40 90% 45%;
+    --accent: 15 100% 65%; /* Warm Red */
+    --accent-foreground: 40 90% 25%;
+    --highlight: 45 100% 75%;
+    --shadow-color: 40 90% 20%;
+    --destructive: 0 90% 60%;
+    --destructive-foreground: 45 100% 95%;
+    --border: 45 90% 90%;
+    --input: 45 90% 90%;
+    --ring: 35 100% 60%;
+  }
+```
+
+```
+<<<<<<< SEARCH
+  .crimson {
+    --background-start: 350 40% 15%;
+    --background-end: 350 40% 10%;
+    --foreground: 350 60% 95%;
+    --card-background: 350 40% 18%;
+    --card-foreground: 350 60% 90%;
+    --popover-background: 350 40% 12%;
+    --popover-foreground: 350 60% 95%;
+    --primary: 350 80% 65%; /* Blood Red */
+    --primary-foreground: 350 60% 98%;
+    --secondary: 350 70% 55%; /* Darker Red */
+    --secondary-foreground: 350 60% 98%;
+    --muted: 350 40% 22%;
+    --muted-foreground: 350 60% 65%;
+    --accent: 350 90% 80%; /* Bright Crimson */
+    --accent-foreground: 350 40% 12%;
+    --highlight: 350 90% 70%;
+    --shadow-color: 350 40% 8%;
+    --destructive: 350 75% 50%;
+    --destructive-foreground: 350 60% 95%;
+    --border: 350 40% 30%;
+    --input: 350 40% 30%;
+    --ring: 350 80% 65%;
+  }
+=======
+  .crimson {
+    --background-start: 350 45% 20%;
+    --background-end: 350 45% 15%;
+    --foreground: 350 65% 95%;
+    --card-background: 350 45% 25%;
+    --card-foreground: 350 65% 90%;
+    --popover-background: 350 45% 18%;
+    --popover-foreground: 350 65% 95%;
+    --primary: 350 85% 75%; /* Blood Red */
+    --primary-foreground: 350 65% 98%;
+    --secondary: 350 75% 65%; /* Darker Red */
+    --secondary-foreground: 350 65% 98%;
+    --muted: 350 45% 30%;
+    --muted-foreground: 350 65% 70%;
+    --accent: 350 95% 85%; /* Bright Crimson */
+    --accent-foreground: 350 45% 18%;
+    --highlight: 350 95% 80%;
+    --shadow-color: 350 45% 12%;
+    --destructive: 350 80% 60%;
+    --destructive-foreground: 350 65% 95%;
+    --border: 350 45% 40%;
+    --input: 350 45% 40%;
+    --ring: 350 85% 70%;
+  }
+```
+
+```
+<<<<<<< SEARCH
+  .abyss {
+    --background-start: 230 30% 12%;
+    --background-end: 230 30% 6%;
+    --foreground: 220 30% 95%;
+    --card-background: 230 30% 14%;
+    --card-foreground: 220 30% 90%;
+    --popover-background: 230 30% 8%;
+    --popover-foreground: 220 30% 95%;
+    --primary: 210 100% 65%; /* Deep Sea Blue */
+    --primary-foreground: 230 30% 8%;
+    --secondary: 250 90% 75%; /* Luminous Purple */
+    --secondary-foreground: 230 30% 8%;
+    --muted: 230 30% 20%;
+    --muted-foreground: 220 30% 65%;
+    --accent: 180 100% 55%; /* Bioluminescent Teal */
+    --accent-foreground: 230 30% 8%;
+    --highlight: 210 100% 70%;
+    --shadow-color: 230 30% 5%;
+    --destructive: 300 90% 65%;
+    --destructive-foreground: 220 30% 95%;
+    --border: 230 30% 25%;
+    --input: 230 30% 25%;
+    --ring: 210 100% 65%;
+  }
+=======
+  .abyss {
+    --background-start: 230 35% 18%;
+    --background-end: 230 35% 12%;
+    --foreground: 220 35% 95%;
+    --card-background: 230 35% 20%;
+    --card-foreground: 220 35% 90%;
+    --popover-background: 230 35% 12%;
+    --popover-foreground: 220 35% 95%;
+    --primary: 210 100% 70%; /* Deep Sea Blue */
+    --primary-foreground: 230 35% 12%;
+    --secondary: 250 95% 80%; /* Luminous Purple */
+    --secondary-foreground: 230 35% 12%;
+    --muted: 230 35% 25%;
+    --muted-foreground: 220 35% 70%;
+    --accent: 180 100% 60%; /* Bioluminescent Teal */
+    --accent-foreground: 230 35% 12%;
+    --highlight: 210 100% 75%;
+    --shadow-color: 230 35% 8%;
+    --destructive: 300 95% 70%;
+    --destructive-foreground: 220 35% 95%;
+    --border: 230 35% 30%;
+    --input: 230 35% 30%;
+    --ring: 210 100% 70%;
+  }
+```
+
+```
+<<<<<<< SEARCH
+  .forest {
+    --background: 120 30% 12%;
+    --foreground: 100 30% 95%;
+    --card: 120 30% 18%;
+    --card-foreground: 100 30% 90%;
+    --popover: 120 30% 12%;
+    --popover-foreground: 100 30% 95%;
+    --primary: 110 80% 50%; /* Emerald Green */
+    --primary-foreground: 100 30% 95%;
+    --secondary: 80 50% 40%; /* Moss Green */
+    --secondary-foreground: 100 30% 95%;
+    --muted: 120 30% 22%;
+    --muted-foreground: 100 30% 65%;
+    --accent: 40 90% 65%; /* Goldenrod */
+    --accent-foreground: 120 30% 12%;
+    --destructive: 20 80% 50%;
+    --destructive-foreground: 100 30% 95%;
+    --border: 120 30% 28%;
+    --input: 120 30% 28%;
+    --ring: 110 80% 50%;
+  }
+=======
+  .forest {
+    --background-start: 120 35% 22%;
+    --background-end: 120 35% 14%;
+    --foreground: 100 35% 95%;
+    --card-background: 120 35% 22%;
+    --card-foreground: 100 35% 90%;
+    --popover-background: 120 35% 16%;
+    --popover-foreground: 100 35% 95%;
+    --primary: 110 85% 55%; /* Emerald Green */
+    --primary-foreground: 100 35% 95%;
+    --secondary: 80 55% 45%; /* Moss Green */
+    --secondary-foreground: 100 35% 95%;
+    --muted: 120 35% 28%;
+    --muted-foreground: 100 35% 70%;
+    --accent: 40 95% 70%; /* Goldenrod */
+    --accent-foreground: 120 35% 16%;
+    --highlight: 100 85% 65%;
+    --shadow-color: 120 35% 15%;
+    --destructive: 20 85% 55%;
+    --destructive-foreground: 100 35% 95%;
+    --border: 120 35% 32%;
+    --input: 120 35% 32%;
+    --ring: 110 85% 55%;
+  }
+```
+
+```
+<<<<<<< SEARCH
+  .synthwave {
+    --background-start: 280 60% 12%;
+    --background-end: 280 60% 10%;
+    --foreground: 320 100% 95%;
+    --card-background: 280 60% 18%;
+    --card-foreground: 320 100% 90%;
+    --popover-background: 280 60% 12%;
+    --popover-foreground: 320 100% 95%;
+    --primary: 320 100% 75%; /* Neon Pink */
+    --primary-foreground: 320 100% 95%;
+    --secondary: 180 100% 65%; /* Electric Cyan */
+    --secondary-foreground: 280 60% 12%;
+    --muted: 280 60% 22%;
+    --muted-foreground: 320 100% 85%;
+    --accent: 50 100% 75%; /* Sunset Orange */
+    --accent-foreground: 280 60% 12%;
+    --highlight: 320 100% 80%;
+    --shadow-color: 280 60% 8%;
+    --destructive: 0 100% 75%;
+    --destructive-foreground: 320 100% 95%;
+    --border: 280 60% 28%;
+    --input: 280 60% 28%;
+    --ring: 320 100% 75%;
+  }
+=======
+  .synthwave {
+    --background-start: 280 65% 22%;
+    --background-end: 280 65% 14%;
+    --foreground: 320 100% 95%;
+    --card-background: 280 65% 22%;
+    --card-foreground: 320 100% 90%;
+    --popover-background: 280 65% 16%;
+    --popover-foreground: 320 100% 95%;
+    --primary: 320 100% 80%; /* Neon Pink */
+    --primary-foreground: 320 100% 95%;
+    --secondary: 180 100% 70%; /* Electric Cyan */
+    --secondary-foreground: 280 65% 16%;
+    --muted: 280 65% 28%;
+    --muted-foreground: 320 100% 90%;
+    --accent: 50 100% 80%; /* Sunset Orange */
+    --accent-foreground: 280 65% 16%;
+    --highlight: 320 100% 85%;
+    --shadow-color: 280 65% 12%;
+    --destructive: 0 100% 80%;
+    --destructive-foreground: 320 100% 95%;
+    --border: 280 65% 32%;
+    --input: 280 65% 32%;
+    --ring: 320 100% 80%;
+  }
+```
+
+```
+<<<<<<< SEARCH
+  .arctic {
+    --background-start: 200 60% 100%;
+    --background-end: 200 60% 90%;
+    --foreground: 210 40% 15%;
+    --card-background: 200 60% 100%;
+    --card-foreground: 210 40% 15%;
+    --popover-background: 200 60% 100%;
+    --popover-foreground: 210 40% 15%;
+    --primary: 210 100% 55%;
+    --primary-foreground: 200 60% 98%;
+    --secondary: 190 90% 75%;
+    --secondary-foreground: 210 40% 15%;
+    --muted: 200 60% 92%;
+    --muted-foreground: 210 40% 50%;
+    --accent: 220 100% 65%;
+    --accent-foreground: 200 60% 98%;
+    --highlight: 210 90% 70%;
+    --shadow-color: 200 60% 90%;
+    --destructive: 0 90% 55%;
+    --destructive-foreground: 200 60% 98%;
+    --border: 200 60% 90%;
+    --input: 200 60% 90%;
+    --ring: 210 100% 55%;
+  }
+=======
+  .arctic {
+    --background-start: 200 65% 100%;
+    --background-end: 200 65% 92%;
+    --foreground: 210 45% 20%;
+    --card-background: 200 65% 100%;
+    --card-foreground: 210 45% 20%;
+    --popover-background: 200 65% 100%;
+    --popover-foreground: 210 45% 20%;
+    --primary: 210 100% 60%;
+    --primary-foreground: 200 65% 98%;
+    --secondary: 190 95% 80%;
+    --secondary-foreground: 210 45% 20%;
+    --muted: 200 65% 95%;
+    --muted-foreground: 210 45% 55%;
+    --accent: 220 100% 70%;
+    --accent-foreground: 200 65% 98%;
+    --highlight: 210 95% 75%;
+    --shadow-color: 200 65% 95%;
+    --destructive: 0 95% 60%;
+    --destructive-foreground: 200 65% 98%;
+    --border: 200 65% 95%;
+    --input: 200 65% 95%;
+    --ring: 210 100% 60%;
+  }

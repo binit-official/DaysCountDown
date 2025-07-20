@@ -240,8 +240,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="relative overflow-hidden border-b border-primary/30">
-        <div className="absolute inset-0 bg-gradient-neon opacity-20"></div>
+      <header className="relative z-10 border-b border-primary/20 bg-background/50 backdrop-blur-sm header-aurora animate-aurora">
         <div className="relative container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Logo />
