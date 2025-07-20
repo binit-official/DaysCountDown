@@ -3,35 +3,76 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Smile } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from 'sonner';
+import { Smile, Zap, Frown, Angry, Brain } from 'lucide-react';
 
 export const MoodTracker = () => {
   const { user } = useAuth();
-  const [lastMoodLog, setLastMoodLog] = useState<Date | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [initialCheckComplete, setInitialCheckComplete] = useState(false);
 
   useEffect(() => {
     if (!user) return;
+
     const moodCollectionRef = collection(db, 'users', user.uid, 'moodEntries');
     const q = query(moodCollectionRef, orderBy('timestamp', 'desc'), limit(1));
+    
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      let lastLogTime: Date | null = null;
       if (!querySnapshot.empty) {
-        const lastLog = querySnapshot.docs[0].data().timestamp.toDate();
-        setLastMoodLog(lastLog);
-        const hoursSinceLastLog = (new Date().getTime() - lastLog.getTime()) / (1000 * 60 * 60);
+        lastLogTime = querySnapshot.docs[0].data().timestamp.toDate();
+      }
+
+      if (lastLogTime) {
+        const hoursSinceLastLog = (new Date().getTime() - lastLogTime.getTime()) / (1000 * 60 * 60);
         if (hoursSinceLastLog > 5) {
           setShowPrompt(true);
-        } else {
-          setShowPrompt(false);
         }
       } else {
+        // If there are no entries ever, prompt them.
         setShowPrompt(true);
       }
+      setInitialCheckComplete(true);
     });
+
     return () => unsubscribe();
   }, [user]);
+
+  // This effect will run a timer to check periodically after the initial check.
+  useEffect(() => {
+    if (!initialCheckComplete) return;
+
+    const intervalId = setInterval(() => {
+      // Re-check the condition every 5 minutes
+      const moodCollectionRef = collection(db, 'users', user.uid, 'moodEntries');
+      const q = query(moodCollectionRef, orderBy('timestamp', 'desc'), limit(1));
+      onSnapshot(q, (querySnapshot) => {
+        let lastLogTime: Date | null = null;
+        if (!querySnapshot.empty) {
+          lastLogTime = querySnapshot.docs[0].data().timestamp.toDate();
+        }
+
+        if (lastLogTime) {
+          const hoursSinceLastLog = (new Date().getTime() - lastLogTime.getTime()) / (1000 * 60 * 60);
+          if (hoursSinceLastLog > 5) {
+            setShowPrompt(true);
+          }
+        } else {
+          setShowPrompt(true);
+        }
+      });
+    }, 300000); // 300000 ms = 5 minutes
+
+    return () => clearInterval(intervalId);
+  }, [initialCheckComplete, user]);
+
 
   const handleMoodLog = async (mood: string) => {
     if (!user) return;
@@ -41,27 +82,40 @@ export const MoodTracker = () => {
       timestamp: new Date(),
     });
     toast.success(`Mood logged: ${mood}`);
+    setShowPrompt(false);
   };
 
-  if (!showPrompt) {
-    return null;
-  }
+  const moodOptions = [
+    { mood: 'Productive', icon: <Zap className="w-8 h-8" />, color: "text-green-400" },
+    { mood: 'Focused', icon: <Brain className="w-8 h-8" />, color: "text-blue-400" },
+    { mood: 'Exhausted', icon: <Frown className="w-8 h-8" />, color: "text-yellow-400" },
+    { mood: 'Confused', icon: <Smile className="w-8 h-8" />, color: "text-purple-400" },
+    { mood: 'Angry', icon: <Angry className="w-8 h-8" />, color: "text-red-500" },
+  ];
 
   return (
-    <Card className="neon-border bg-card/90">
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Smile className="w-5 h-5 mr-2" />
-          How are you feeling?
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
-        <Button onClick={() => handleMoodLog('Focused')} size="sm">Focused</Button>
-        <Button onClick={() => handleMoodLog('Productive')} size="sm">Productive</Button>
-        <Button onClick={() => handleMoodLog('Exhausted')} size="sm" variant="secondary">Exhausted</Button>
-        <Button onClick={() => handleMoodLog('Confused')} size="sm" variant="secondary">Confused</Button>
-        <Button onClick={() => handleMoodLog('Angry')} size="sm" variant="destructive">Angry</Button>
-      </CardContent>
-    </Card>
+    <Dialog open={showPrompt} onOpenChange={setShowPrompt}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="text-center text-2xl">How are you feeling?</DialogTitle>
+          <DialogDescription className="text-center">
+            A quick check-in helps you stay aware of your emotional state.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-3 gap-4 py-4">
+          {moodOptions.map(({ mood, icon, color }) => (
+            <Button
+              key={mood}
+              variant="outline"
+              className={`flex flex-col h-24 items-center justify-center gap-2 border-2 hover:border-primary ${color}`}
+              onClick={() => handleMoodLog(mood)}
+            >
+              {icon}
+              <span className="text-sm">{mood}</span>
+            </Button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
