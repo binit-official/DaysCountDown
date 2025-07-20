@@ -159,21 +159,51 @@ const Index = () => {
     toast.success(`🔥 Streak extended to ${newStreak} days!`);
   };
   
-  const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
-    if (!user || !roadmap) return;
+  const revertStreakForToday = async () => {
+    if (!user) return;
+    const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+    const docSnap = await getDoc(statsDocRef);
+    if (!docSnap.exists()) return;
 
-    const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
-    setRoadmap(updatedRoadmap);
+    const stats = docSnap.data();
+    const lastCompletedDate = stats.lastCompleted?.toDate();
 
-    const todayTasks = updatedDailyTasks.filter(task => task.day === currentDay);
-    const allTodayComplete = todayTasks.length > 0 && todayTasks.every(task => task.completed);
+    if (lastCompletedDate && isToday(lastCompletedDate)) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const newStreak = (stats.streak || 1) - 1;
 
-    if (allTodayComplete) {
-      await checkStreaksAndAchievements();
+        await updateDoc(statsDocRef, {
+            streak: newStreak,
+            lastCompleted: stats.streak > 1 ? yesterday : null
+        });
+        toast.info("Streak reverted for today.");
     }
+  };
+  
+  const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
+      if (!user || !roadmap) return;
 
-    const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
-    await setDoc(roadmapDocRef, updatedRoadmap, { merge: true });
+      const wasAllTodayComplete = roadmap.dailyTasks
+          .filter((t: any) => t.day === currentDay)
+          .every((t: any) => t.completed);
+
+      const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
+      setRoadmap(updatedRoadmap);
+
+      const isAllTodayComplete = updatedDailyTasks
+          .filter(t => t.day === currentDay)
+          .every(t => t.completed);
+
+      if (isAllTodayComplete && !wasAllTodayComplete) {
+          await checkStreaksAndAchievements();
+      } else if (!isAllTodayComplete && wasAllTodayComplete) {
+          await revertStreakForToday();
+      }
+
+      const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
+      await setDoc(roadmapDocRef, updatedRoadmap, { merge: true });
   };
 
   const handleArchiveMission = async (taskToArchive: Task) => {
