@@ -16,6 +16,7 @@ import { AlertTriangle, Zap, Flame, Target } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { isToday, isYesterday } from 'date-fns';
 import { toast } from 'sonner';
+import { DashboardStats } from '@/components/DashboardStats';
 
 const Index = () => {
   const { user } = useAuth();
@@ -27,6 +28,8 @@ const Index = () => {
   const [currentDay, setCurrentDay] = useState<number>(1);
   const [hasIncompleteTasks, setHasIncompleteTasks] = useState(false);
   const [allTasksCompleted, setAllTasksCompleted] = useState(false);
+  const [stats, setStats] = useState({ streak: 0, completedMissions: 0 });
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
 
   useEffect(() => {
     const calculateCurrentDay = (startDate: Date | undefined) => {
@@ -94,10 +97,11 @@ const Index = () => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             const lastCompleted = data.lastCompleted?.toDate();
-            // This resets the streak if the user has missed a day.
             if (lastCompleted && !isToday(lastCompleted) && !isYesterday(lastCompleted)) {
                 await updateDoc(statsDocRef, { streak: 0 });
             }
+            setStats({ streak: data.streak || 0, completedMissions: data.completedMissions || 0 });
+            setUnlockedAchievements(data.unlockedAchievements || []);
         }
     });
 
@@ -133,13 +137,10 @@ const Index = () => {
 
     const lastCompletedDate = stats.lastCompleted?.toDate();
 
-    // If a task for today has already been completed and logged, do nothing.
     if (lastCompletedDate && isToday(lastCompletedDate)) {
       return;
     }
 
-    // If the last completed task was yesterday, increment the streak.
-    // Otherwise, start a new streak of 1.
     const newStreak = (lastCompletedDate && isYesterday(lastCompletedDate))
       ? (stats.streak || 0) + 1
       : 1;
@@ -151,7 +152,7 @@ const Index = () => {
     const newStats = {
       ...stats,
       streak: newStreak,
-      lastCompleted: new Date(), // Set lastCompleted to now.
+      lastCompleted: new Date(),
       unlockedAchievements: [...new Set(newAchievements)],
     };
 
@@ -263,6 +264,13 @@ const Index = () => {
               <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} onArchive={handleArchiveMission} />
             </Card>
             <AIPlanner onRoadmapChange={handleRoadmapUpdate} disabled={isNewUser} user={user} />
+            <AIAssistant
+              currentRoadmap={roadmap}
+              hasIncompleteTasks={hasIncompleteTasks}
+              allTasksCompleted={allTasksCompleted}
+              currentDay={currentDay}
+              isNewUser={isNewUser}
+            />
           </div>
           <div className="lg:col-span-6 space-y-6">
             <Card className="p-4 md:p-8 neon-border bg-card/90 backdrop-blur-sm">
@@ -280,13 +288,7 @@ const Index = () => {
           </div>
           <div className="lg:col-span-3 space-y-6">
             <DailyTaskCard roadmap={roadmap} selectedDay={selectedDay} onRoadmapUpdate={handleDailyTaskUpdate} currentDay={currentDay} />
-            <AIAssistant
-              currentRoadmap={roadmap}
-              hasIncompleteTasks={hasIncompleteTasks}
-              allTasksCompleted={allTasksCompleted}
-              currentDay={currentDay}
-              isNewUser={isNewUser}
-            />
+            <DashboardStats stats={stats} unlockedAchievements={unlockedAchievements} />
           </div>
         </div>
         <div className="mt-8 lg:mt-12">
