@@ -1,10 +1,8 @@
-// src/components/AIAssistant.tsx
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { Bot, User, CornerDownLeft, RefreshCw, BrainCircuit, Flame } from 'lucide-react';
+import { Bot, User, CornerDownLeft, RefreshCw, BrainCircuit, Flame, X } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 
@@ -30,6 +28,7 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
   const [loading, setLoading] = useState(false);
   const [aiPersona, setAiPersona] = useState<'nyx' | 'general'>('nyx');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
   
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -78,9 +77,11 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
   };
   
   useEffect(() => {
-    setMessages([]);
-    generateInitialMessage();
-  }, [aiPersona, isNewUser, currentRoadmap]);
+    if (isOpen) {
+      setMessages([]);
+      generateInitialMessage();
+    }
+  }, [aiPersona, isNewUser, currentRoadmap, isOpen]);
 
 
   const handleSendMessage = async () => {
@@ -144,58 +145,76 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
     generateInitialMessage();
   };
 
+  if (!isOpen) {
+    return (
+      <Button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-8 right-8 h-16 w-16 rounded-full shadow-lg pulse-glow"
+      >
+        <Bot className="w-8 h-8" />
+      </Button>
+    );
+  }
+
   return (
-    <Card className="flex flex-col h-[380px] neon-border bg-card/90 backdrop-blur-sm border-secondary/50">
-      <div className="flex items-center justify-between p-3 border-b border-secondary/20 flex-shrink-0">
-        <ToggleGroup type="single" value={aiPersona} onValueChange={(value: 'nyx' | 'general') => value && setAiPersona(value)} className="justify-start">
-            <ToggleGroupItem value="nyx" aria-label="Switch to Nyx" className="flex gap-2 data-[state=on]:bg-secondary/20 data-[state=on]:text-secondary">
-                <Flame className="w-4 h-4" /> Nyx
-            </ToggleGroupItem>
-            <ToggleGroupItem value="general" aria-label="Switch to General AI" className="flex gap-2 data-[state=on]:bg-primary/20 data-[state=on]:text-primary">
-                <BrainCircuit className="w-4 h-4" /> General
-            </ToggleGroupItem>
-        </ToggleGroup>
-        <Button variant="ghost" size="icon" onClick={handleNewChat} className="h-7 w-7">
-            <RefreshCw className="w-4 h-4" />
-        </Button>
-      </div>
-      <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
-        <div className="p-3 space-y-3">
-          {messages.length === 0 && !loading && (
-            <div className="text-center text-muted-foreground py-12 px-4">
-              <p className="font-bold">Start a new conversation.</p>
-            </div>
-          )}
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex items-start gap-2 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
-              {msg.sender === 'ai' && <Bot className="w-5 h-5 text-secondary flex-shrink-0 mt-1" />}
-              <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-primary/20' : 'bg-secondary/10'}`}>
-                <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+    <div className="fixed bottom-8 right-8 z-50">
+      <Card className="flex flex-col h-[480px] w-96 neon-border bg-card/90 backdrop-blur-sm border-secondary/50">
+        <div className="flex items-center justify-between p-3 border-b border-secondary/20 flex-shrink-0">
+          <ToggleGroup type="single" value={aiPersona} onValueChange={(value: 'nyx' | 'general') => value && setAiPersona(value)} className="justify-start">
+              <ToggleGroupItem value="nyx" aria-label="Switch to Nyx" className="flex gap-2 data-[state=on]:bg-secondary/20 data-[state=on]:text-secondary">
+                  <Flame className="w-4 h-4" /> Nyx
+              </ToggleGroupItem>
+              <ToggleGroupItem value="general" aria-label="Switch to General AI" className="flex gap-2 data-[state=on]:bg-primary/20 data-[state=on]:text-primary">
+                  <BrainCircuit className="w-4 h-4" /> General
+              </ToggleGroupItem>
+          </ToggleGroup>
+          <div className="flex items-center">
+            <Button variant="ghost" size="icon" onClick={handleNewChat} className="h-7 w-7">
+                <RefreshCw className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="h-7 w-7">
+                <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+        <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
+          <div className="p-3 space-y-3">
+            {messages.length === 0 && !loading && (
+              <div className="text-center text-muted-foreground py-12 px-4">
+                <p className="font-bold">Start a new conversation.</p>
               </div>
-              {msg.sender === 'user' && <User className="w-5 h-5 text-primary flex-shrink-0 mt-1" />}
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <Bot className="w-5 h-5 text-secondary animate-spin" />
-            </div>
-          )}
+            )}
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex items-start gap-2 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
+                {msg.sender === 'ai' && <Bot className="w-5 h-5 text-secondary flex-shrink-0 mt-1" />}
+                <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-primary/20' : 'bg-secondary/10'}`}>
+                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                </div>
+                {msg.sender === 'user' && <User className="w-5 h-5 text-primary flex-shrink-0 mt-1" />}
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <Bot className="w-5 h-5 text-secondary animate-spin" />
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+        <div className="p-2 border-t border-secondary/20 flex-shrink-0">
+          <div className="relative">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={isNewUser ? "Create a mission to begin..." : `Chat with ${aiPersona === 'nyx' ? 'Nyx' : 'General AI'}...`}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+              className="pr-10 bg-background/50 text-sm"
+              rows={1}
+              disabled={isNewUser || loading}
+            />
+            <Button size="icon" onClick={handleSendMessage} disabled={isNewUser || loading} className="absolute right-1.5 bottom-1 h-7 w-7"><CornerDownLeft className="w-4 h-4" /></Button>
+          </div>
         </div>
-      </ScrollArea>
-      <div className="p-2 border-t border-secondary/20 flex-shrink-0">
-        <div className="relative">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={isNewUser ? "Create a mission to begin..." : `Chat with ${aiPersona === 'nyx' ? 'Nyx' : 'General AI'}...`}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-            className="pr-10 bg-background/50 text-sm"
-            rows={1}
-            disabled={isNewUser || loading}
-          />
-          <Button size="icon" onClick={handleSendMessage} disabled={isNewUser || loading} className="absolute right-1.5 bottom-1 h-7 w-7"><CornerDownLeft className="w-4 w-4" /></Button>
-        </div>
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 };

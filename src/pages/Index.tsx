@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { DashboardStats } from '@/components/DashboardStats';
 import { Journal } from '@/components/Journal';
 import { MoodTracker } from '@/components/MoodTracker';
+import { AICoach } from '@/components/AICoach';
 
 const Index = () => {
   const { user } = useAuth();
@@ -286,18 +287,19 @@ const Index = () => {
             <DailyTaskCard roadmap={roadmap} selectedDay={selectedDay} onRoadmapUpdate={handleDailyTaskUpdate} currentDay={currentDay} />
             <DashboardStats stats={stats} unlockedAchievements={unlockedAchievements} />
             <MoodTracker />
-            <AIAssistant
-              currentRoadmap={roadmap}
-              hasIncompleteTasks={hasIncompleteTasks}
-              allTasksCompleted={allTasksCompleted}
-              currentDay={currentDay}
-              isNewUser={isNewUser}
-            />
+            <AICoach />
           </div>
         </div>
         <div className="mt-8 lg:mt-12">
           <Roadmap roadmap={roadmap} selectedDay={selectedDay} onSelectDay={setSelectedDay} currentDay={currentDay} />
         </div>
+        <AIAssistant
+          currentRoadmap={roadmap}
+          hasIncompleteTasks={hasIncompleteTasks}
+          allTasksCompleted={allTasksCompleted}
+          currentDay={currentDay}
+          isNewUser={isNewUser}
+        />
       </main>
       <Footer />
     </div>
