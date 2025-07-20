@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from './ui/button';
-import { User, LogOut } from 'lucide-react';
+import { User, LogOut, TrendingUp, BookOpen } from 'lucide-react';
 import { ThemeSwitcher } from './ThemeSwitcher';
 
 export const UserNav = () => {
@@ -54,6 +54,18 @@ export const UserNav = () => {
             <DropdownMenuItem>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
+            </DropdownMenuItem>
+          </Link>
+          <Link to="/progress">
+            <DropdownMenuItem>
+              <TrendingUp className="mr-2 h-4 w-4" />
+              <span>Progress</span>
+            </DropdownMenuItem>
+          </Link>
+          <Link to="/journal">
+            <DropdownMenuItem>
+              <BookOpen className="mr-2 h-4 w-4" />
+              <span>Journal</span>
             </DropdownMenuItem>
           </Link>
           <DropdownMenuItem onClick={handleLogout}>

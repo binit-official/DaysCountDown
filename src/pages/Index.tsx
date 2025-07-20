@@ -17,6 +17,8 @@ import { Footer } from '@/components/Footer';
 import { isToday, isYesterday } from 'date-fns';
 import { toast } from 'sonner';
 import { DashboardStats } from '@/components/DashboardStats';
+import { Journal } from '@/components/Journal';
+import { MoodTracker } from '@/components/MoodTracker';
 
 const Index = () => {
   const { user } = useAuth();
@@ -240,7 +242,8 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="relative z-10 border-b border-primary/20 bg-background/50 backdrop-blur-sm header-aurora animate-aurora">
+      <header className="relative z-10 border-b border-primary/20 bg-background/50 backdrop-blur-sm">
+        <div className="absolute inset-0 -z-10 h-full w-full bg-[radial-gradient(hsl(var(--primary)/0.1)_1px,transparent_1px)] [background-size:16px_16px]"></div>
         <div className="relative container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Logo />
@@ -262,14 +265,8 @@ const Index = () => {
             <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
               <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} onArchive={handleArchiveMission} />
             </Card>
+            <Journal />
             <AIPlanner onRoadmapChange={handleRoadmapUpdate} disabled={isNewUser} user={user} />
-            <AIAssistant
-              currentRoadmap={roadmap}
-              hasIncompleteTasks={hasIncompleteTasks}
-              allTasksCompleted={allTasksCompleted}
-              currentDay={currentDay}
-              isNewUser={isNewUser}
-            />
           </div>
           <div className="lg:col-span-6 space-y-6">
             <Card className="p-4 md:p-8 neon-border bg-card/90 backdrop-blur-sm">
@@ -288,6 +285,14 @@ const Index = () => {
           <div className="lg:col-span-3 space-y-6">
             <DailyTaskCard roadmap={roadmap} selectedDay={selectedDay} onRoadmapUpdate={handleDailyTaskUpdate} currentDay={currentDay} />
             <DashboardStats stats={stats} unlockedAchievements={unlockedAchievements} />
+            <MoodTracker />
+            <AIAssistant
+              currentRoadmap={roadmap}
+              hasIncompleteTasks={hasIncompleteTasks}
+              allTasksCompleted={allTasksCompleted}
+              currentDay={currentDay}
+              isNewUser={isNewUser}
+            />
           </div>
         </div>
         <div className="mt-8 lg:mt-12">

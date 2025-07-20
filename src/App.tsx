@@ -12,6 +12,8 @@ import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "next-themes";
+import ProgressDashboard from "./pages/ProgressDashboard.tsx";
+import JournalEntries from "./pages/JournalEntries.tsx";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +36,8 @@ const App = () => (
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<Index />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/progress" element={<ProgressDashboard />} />
+                <Route path="/journal" element={<JournalEntries />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
