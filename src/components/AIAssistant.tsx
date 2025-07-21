@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Bot, User, CornerDownLeft, RefreshCw, BrainCircuit, Flame, X } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
+import { fetchWithRetry } from '@/lib/utils';
 
 interface AIAssistantProps {
   currentRoadmap: any | null;
@@ -58,7 +59,7 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
 
     setLoading(true);
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+      const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
@@ -68,9 +69,9 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
       if (text) {
         setMessages([{ id: Date.now(), sender: 'ai', text: text.trim() }]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to generate initial message:", error);
-      setMessages([{ id: Date.now(), sender: 'ai', text: "AI is currently offline." }]);
+      setMessages([{ id: Date.now(), sender: 'ai', text: `Sorry, I'm having trouble connecting. ${error.message}` }]);
     } finally {
       setLoading(false);
     }
@@ -114,13 +115,12 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
     const prompt = aiPersona === 'nyx' ? nyxPrompt : generalPrompt;
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+        const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
         });
 
-        if (!response.ok) throw new Error((await response.json()).error?.message || 'API request failed');
         const data = await response.json();
         const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!rawContent) throw new Error('Invalid API response.');
@@ -129,11 +129,7 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
         
         setMessages(prev => [...prev, aiMessage]);
     } catch (err: any) {
-        let displayError = `Sorry, I hit a snag. Try again.`;
-        if (typeof err.message === 'string' && err.message.toLowerCase().includes('quota')) {
-            displayError = "It seems the AI is a bit popular right now and has hit its usage limit. Please try again later."
-        }
-        const errorMessage: Message = { id: Date.now() + 1, sender: 'ai', text: displayError };
+        const errorMessage: Message = { id: Date.now() + 1, sender: 'ai', text: `Sorry, I'm having trouble connecting. ${err.message}` };
         setMessages(prev => [...prev, errorMessage]);
     } finally {
         setLoading(false);

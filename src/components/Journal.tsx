@@ -31,7 +31,7 @@ export const Journal = () => {
   const handleSaveEntry = async () => {
     if (!user || !entry.trim()) return;
     const journalDocRef = doc(db, 'users', user.uid, 'journal', today);
-    await setDoc(journalDocRef, { entry }, { merge: true });
+    await setDoc(journalDocRef, { entry: entry, timestamp: new Date() }, { merge: true });
     toast.success('Journal entry saved!');
     setEntry(''); // Clear the input field
   };
@@ -47,7 +47,7 @@ export const Journal = () => {
       <CardContent>
         {todaysEntry ? (
           <div className="p-4 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground">Today's Entry (edit in Journal page):</p>
+            <p className="text-sm text-muted-foreground">Today's Entry (view in Journal page):</p>
             <p className="text-base whitespace-pre-wrap">{todaysEntry}</p>
           </div>
         ) : (
