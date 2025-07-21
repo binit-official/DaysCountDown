@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { DashboardStats } from '@/components/DashboardStats';
 import { Journal } from '@/components/Journal';
 import { MoodTracker } from '@/components/MoodTracker';
-import { AICoach } from '@/components/AICoach';
+import { Guiding } from '@/components/Guiding';
 import { FeelingTracker } from '@/components/FeelingTracker';
 
 const Index = () => {
@@ -288,7 +288,7 @@ const Index = () => {
                         <DailyTaskCard roadmap={roadmap} selectedDay={selectedDay} onRoadmapUpdate={handleDailyTaskUpdate} currentDay={currentDay} />
                         <DashboardStats stats={stats} unlockedAchievements={unlockedAchievements} />
                         <MoodTracker />
-                        <AICoach />
+                        <Guiding />
                     </div>
                 </div>
 

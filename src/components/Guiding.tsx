@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Bot, User, CornerDownLeft, X, BrainCircuit } from 'lucide-react';
@@ -19,7 +19,7 @@ interface Message {
     text: string;
 }
 
-export const AICoach = () => {
+export const Guiding = () => {
     const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -27,9 +27,8 @@ export const AICoach = () => {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [hasNewAdvice, setHasNewAdvice] = useState(false);
-    const prevMoodsCount = usePrevious(latestJournalData.moods.length);
+    const prevJournalData = usePrevious(latestJournalData);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
-
 
     useEffect(() => {
         if (scrollAreaRef.current) {
@@ -40,42 +39,62 @@ export const AICoach = () => {
     useEffect(() => {
         if (!user) return;
 
-        // Fetch latest journal document
         const journalCollectionRef = collection(db, 'users', user.uid, 'journal');
-        const qJournal = query(journalCollectionRef, orderBy('id', 'desc'), limit(1));
+        const qJournal = query(journalCollectionRef, orderBy('__name__', 'desc'), limit(1));
+
         const unsubscribeJournal = onSnapshot(qJournal, (querySnapshot) => {
             if (!querySnapshot.empty) {
                 const data = querySnapshot.docs[0].data();
-                setLatestJournalData({
+                const newData = {
                     entry: data.entry || '',
                     moods: data.moods || [],
                     feelings: data.feelings || []
-                });
+                };
+                setLatestJournalData(newData);
             }
         });
 
-        return () => {
-            unsubscribeJournal();
-        };
+        return () => unsubscribeJournal();
     }, [user]);
 
     useEffect(() => {
-        const hasNewMoods = latestJournalData.moods.length > 0 && prevMoodsCount !== latestJournalData.moods.length;
-        if (hasNewMoods) {
-            generateAdvice();
-        }
-    }, [latestJournalData.moods, prevMoodsCount]);
+        // Check if there's new, meaningful data to trigger advice
+        const hasNewMoods = latestJournalData.moods.length > (prevJournalData?.moods.length ?? 0);
+        const hasNewFeelings = latestJournalData.feelings.length > (prevJournalData?.feelings.length ?? 0);
+        const hasNewEntry = latestJournalData.entry && latestJournalData.entry !== prevJournalData?.entry;
 
-    const generateAdvice = async (isInitial = false) => {
-        if (!user) return;
+        if (hasNewMoods || hasNewFeelings || hasNewEntry) {
+             setHasNewAdvice(true);
+        }
+    }, [latestJournalData, prevJournalData]);
+
+
+    const generateInitialGuide = async () => {
+        if (!user || (!latestJournalData.entry && latestJournalData.moods.length === 0 && latestJournalData.feelings.length === 0)) {
+            setMessages([{ sender: 'ai', text: "Hello! I'm here to offer some guidance. How are you feeling today? You can write in your journal or log your state of mind to get started." }]);
+            return;
+        }
+
         setLoading(true);
-        
         const moodsText = latestJournalData.moods.map((m: any) => m.mood).join(', ');
         const feelingsText = latestJournalData.feelings.map((f: any) => `"${f.text}"`).join(', ');
 
-        const prompt = isInitial
-            ? `I'm checking in with my AI emotional support coach. Give me a brief, welcoming message and ask how I'm feeling today.`
-            : `Based on my recent feelings, journal entry, and overall moods, provide some advice for today and tomorrow in a conversational and supportive tone. Keep the initial response concise.\n\nMy States of Mind: ${feelingsText}\nJournal: "${latestJournalData.entry}"\nMy moods today have been: "${moodsText}"`;
+        const prompt = `
+        You are an AI emotional support coach named "Guiding". Your role is to help the user with their emotional state and well-being.
+        Based on the user's latest journal data below, generate a thoughtful and supportive opening message.
+
+        Your response should:
+        1.  Briefly summarize or reflect on their logged feelings and journal entry.
+        2.  Offer a piece of gentle, actionable advice or a comforting perspective.
+        3.  End with an open-ended question like "How does that sound?" or "Is there anything specific on your mind you'd like to explore further?".
+
+        Keep your tone conversational, empathetic, and supportive.
+
+        User's Data:
+        - Moods Logged: "${moodsText || 'None'}"
+        - State of Mind Entries: ${feelingsText || 'None'}
+        - Journal Entry: "${latestJournalData.entry || 'None'}"
+        `;
 
         try {
             const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
@@ -88,17 +107,15 @@ export const AICoach = () => {
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (text) {
                 setMessages([{ sender: 'ai', text: text.trim() }]);
-                if (!isInitial) {
-                    setHasNewAdvice(true);
-                }
             }
         } catch (error: any) {
-            console.error("Failed to generate advice:", error);
-            toast.error(`Failed to get advice from AI coach: ${error.message}`);
+            console.error("Failed to generate initial guide:", error);
+            setMessages([{ sender: 'ai', text: `I'm having a little trouble connecting right now, but I'm here for you. How are you doing?` }]);
         } finally {
             setLoading(false);
         }
     };
+
 
     const handleSendMessage = async () => {
         if (!input.trim() || !user) return;
@@ -112,13 +129,13 @@ export const AICoach = () => {
         const moodsText = latestJournalData.moods.map((m: any) => m.mood).join(', ');
         const feelingsText = latestJournalData.feelings.map((f: any) => `"${f.text}"`).join(', ');
 
-        const prompt = `You are an AI emotional support coach. Your role is to help the user with their emotional state and well-being.
+        const prompt = `You are an AI emotional support coach called "Guiding". Your role is to help the user with their emotional state and well-being.
         The user's states of mind today have been: ${feelingsText}, their journal entry is: "${latestJournalData.entry}", and their moods today have been: "${moodsText}".
         Keep your responses supportive and focused on emotional well-being.
         If the user asks for general information, planning, or anything not related to emotional support, gently redirect them to use the "Nyx" or "General AI" assistants.
         Conversation history:
         ${conversationHistory}
-        AI Coach:`;
+        Guiding:`;
 
         try {
             const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
@@ -133,25 +150,25 @@ export const AICoach = () => {
                 setMessages(prev => [...prev, { sender: 'ai', text: text.trim() }]);
             }
         } catch (error: any) {
-            console.error("Failed to get response from AI coach:", error);
-            toast.error(`Failed to get response from AI coach: ${error.message}`);
+            console.error("Failed to get response from Guiding:", error);
+            toast.error(`Failed to get response from Guiding: ${error.message}`);
         } finally {
             setLoading(false);
         }
     }
-    
-    // ... rest of the component remains the same ...
+
+    const handleOpen = () => {
+        setIsOpen(true);
+        setHasNewAdvice(false);
+        // Generate the guide only when opening the chat window.
+        generateInitialGuide();
+    }
+
     if (!isOpen) {
         return (
             <div className="fixed bottom-28 right-8 z-50">
                 <Button
-                    onClick={() => {
-                        setIsOpen(true);
-                        setHasNewAdvice(false);
-                        if (messages.length === 0) {
-                            generateAdvice(true);
-                        }
-                    }}
+                    onClick={handleOpen}
                     className={cn(
                         "relative h-16 w-16 rounded-full shadow-lg",
                         hasNewAdvice && "animate-pulse"
@@ -164,14 +181,13 @@ export const AICoach = () => {
         );
     }
 
-
     return (
         <div className="fixed bottom-8 right-8 z-50">
             <Card className="flex flex-col h-[480px] w-96 neon-border bg-card/90 backdrop-blur-sm border-secondary/50">
                 <CardHeader className="flex flex-row items-center justify-between p-3 border-b border-secondary/20 flex-shrink-0">
                     <CardTitle className="flex items-center text-base">
                         <Sparkles className="w-5 h-5 mr-2" />
-                        AI Coach
+                        Guiding
                     </CardTitle>
                     <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="h-7 w-7">
                         <X className="w-4 h-4" />
@@ -200,7 +216,7 @@ export const AICoach = () => {
                         <Textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="How are you feeling?"
+                            placeholder="Share what's on your mind..."
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                             className="pr-10 bg-background/50 text-sm"
                             rows={1}
