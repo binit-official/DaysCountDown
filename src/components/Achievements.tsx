@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import { Award, Zap, Flame, Target, Star } from 'lucide-react';
+import { Award, Zap, Flame, Target, Star, BrainCircuit, BookOpen } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +23,8 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
   { id: 'mission_1', name: 'First Mission', description: 'Successfully complete your first mission.', icon: Target },
   { id: 'mission_5', name: 'Serial Achiever', description: 'Successfully complete 5 missions.', icon: Star },
   { id: 'extreme_1', name: 'Daredevil', description: 'Complete a mission with EXTREME priority.', icon: Award },
+  { id: 'study_1_hour', name: 'Focused Mind', description: 'Log your first hour of study time.', icon: BrainCircuit },
+  { id: 'study_10_hours', name: 'Deep Worker', description: 'Log a total of 10 hours of study time.', icon: BookOpen },
 ];
 
 interface AchievementsProps {

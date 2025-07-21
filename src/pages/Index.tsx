@@ -32,7 +32,7 @@ const Index = () => {
     const [currentDay, setCurrentDay] = useState<number>(1);
     const [hasIncompleteTasks, setHasIncompleteTasks] = useState(false);
     const [allTasksCompleted, setAllTasksCompleted] = useState(false);
-    const [stats, setStats] = useState({ streak: 0, completedMissions: 0 });
+    const [stats, setStats] = useState({ streak: 0, completedMissions: 0, totalStudyTime: 0 });
     const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
 
     useEffect(() => {
@@ -104,7 +104,11 @@ const Index = () => {
                 if (lastCompleted && !isToday(lastCompleted) && !isYesterday(lastCompleted)) {
                     await updateDoc(statsDocRef, { streak: 0 });
                 }
-                setStats({ streak: data.streak || 0, completedMissions: data.completedMissions || 0 });
+                setStats({ 
+                    streak: data.streak || 0, 
+                    completedMissions: data.completedMissions || 0,
+                    totalStudyTime: data.totalStudyTime || 0,
+                });
                 setUnlockedAchievements(data.unlockedAchievements || []);
             }
         });
@@ -131,6 +135,70 @@ const Index = () => {
         setRoadmap(newRoadmap);
         const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
         setDoc(roadmapDocRef, newRoadmap, { merge: true });
+    };
+
+    const checkStudyAchievements = async (newTotalStudyTime: number) => {
+        if (!user) return;
+        
+        const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+        const docSnap = await getDoc(statsDocRef);
+        const currentStats = docSnap.exists() ? docSnap.data() : { unlockedAchievements: [], totalStudyTime: 0 };
+        const newAchievements = [...(currentStats.unlockedAchievements || [])];
+        let achievementUnlocked = false;
+
+        // 1 hour = 3600 seconds
+        if (newTotalStudyTime >= 3600 && !newAchievements.includes('study_1_hour')) {
+            newAchievements.push('study_1_hour');
+            toast.success("Achievement Unlocked: Focused Mind!");
+            achievementUnlocked = true;
+        }
+        // 10 hours = 36000 seconds
+        if (newTotalStudyTime >= 36000 && !newAchievements.includes('study_10_hours')) {
+            newAchievements.push('study_10_hours');
+            toast.success("Achievement Unlocked: Deep Worker!");
+            achievementUnlocked = true;
+        }
+
+        if (achievementUnlocked) {
+            await setDoc(statsDocRef, { unlockedAchievements: [...new Set(newAchievements)] }, { merge: true });
+        }
+    };
+
+    const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
+        if (!user || !roadmap) return;
+    
+        const wasAllTodayComplete = roadmap.dailyTasks
+            .filter((t: any) => t.day === currentDay)
+            .every((t: any) => t.completed);
+    
+        const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
+    
+        const isAllTodayComplete = updatedDailyTasks
+            .filter(t => t.day === currentDay)
+            .every(t => t.completed);
+    
+        if (isAllTodayComplete && !wasAllTodayComplete) {
+            await checkStreaksAndAchievements();
+        } else if (!isAllTodayComplete && wasAllTodayComplete) {
+            await revertStreakForToday();
+        }
+    
+        // Calculate total study time and check for achievements
+        const oldTotalStudyTime = roadmap.dailyTasks.flat().reduce((acc: number, task: any) => acc + (task.subTasks?.reduce((subAcc: number, sub: any) => subAcc + (sub.studyTimeLogged || 0), 0) || 0), 0);
+        const newTotalStudyTime = updatedDailyTasks.flat().reduce((acc: number, task: any) => acc + (task.subTasks?.reduce((subAcc: number, sub: any) => subAcc + (sub.studyTimeLogged || 0), 0) || 0), 0);
+        
+        if (newTotalStudyTime > oldTotalStudyTime) {
+            const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+            const docSnap = await getDoc(statsDocRef);
+            const currentTotal = docSnap.exists() ? (docSnap.data().totalStudyTime || 0) : 0;
+            const finalTotal = currentTotal + (newTotalStudyTime - oldTotalStudyTime);
+
+            await setDoc(statsDocRef, { totalStudyTime: finalTotal }, { merge: true });
+            await checkStudyAchievements(finalTotal);
+        }
+        
+        // This will trigger the onSnapshot listener to update the local state
+        handleRoadmapUpdate(updatedRoadmap); 
     };
 
     const checkStreaksAndAchievements = async () => {
@@ -187,30 +255,6 @@ const Index = () => {
         }
     };
 
-    const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
-        if (!user || !roadmap) return;
-
-        const wasAllTodayComplete = roadmap.dailyTasks
-            .filter((t: any) => t.day === currentDay)
-            .every((t: any) => t.completed);
-
-        const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
-        setRoadmap(updatedRoadmap);
-
-        const isAllTodayComplete = updatedDailyTasks
-            .filter(t => t.day === currentDay)
-            .every(t => t.completed);
-
-        if (isAllTodayComplete && !wasAllTodayComplete) {
-            await checkStreaksAndAchievements();
-        } else if (!isAllTodayComplete && wasAllTodayComplete) {
-            await revertStreakForToday();
-        }
-
-        const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
-        await setDoc(roadmapDocRef, updatedRoadmap, { merge: true });
-    };
-
     const handleArchiveMission = async (taskToArchive: Task) => {
         if (!user) return;
         const updatedTasks = tasks.filter(t => t.id !== taskToArchive.id);
@@ -224,9 +268,9 @@ const Index = () => {
         stats.completedMissions = newCompletedCount;
         stats.archivedTasks = [...(stats.archivedTasks || []), taskToArchive];
 
-        if (newCompletedCount >= 1) stats.unlockedAchievements.push('mission_1');
-        if (newCompletedCount >= 5) stats.unlockedAchievements.push('mission_5');
-        if (taskToArchive.priority === 'extreme') stats.unlockedAchievements.push('extreme_1');
+        if (newCompletedCount >= 1 && !stats.unlockedAchievements.includes('mission_1')) stats.unlockedAchievements.push('mission_1');
+        if (newCompletedCount >= 5 && !stats.unlockedAchievements.includes('mission_5')) stats.unlockedAchievements.push('mission_5');
+        if (taskToArchive.priority === 'extreme' && !stats.unlockedAchievements.includes('extreme_1')) stats.unlockedAchievements.push('extreme_1');
 
         await setDoc(statsDocRef, { ...stats, unlockedAchievements: [...new Set(stats.unlockedAchievements)] }, { merge: true });
 
