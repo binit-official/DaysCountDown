@@ -58,7 +58,6 @@ export const Guiding = () => {
     }, [user]);
 
     useEffect(() => {
-        // Check if there's new, meaningful data to trigger advice
         const hasNewMoods = latestJournalData.moods.length > (prevJournalData?.moods.length ?? 0);
         const hasNewFeelings = latestJournalData.feelings.length > (prevJournalData?.feelings.length ?? 0);
         const hasNewEntry = latestJournalData.entry && latestJournalData.entry !== prevJournalData?.entry;
@@ -70,30 +69,32 @@ export const Guiding = () => {
 
 
     const generateInitialGuide = async () => {
-        if (!user || (!latestJournalData.entry && latestJournalData.moods.length === 0 && latestJournalData.feelings.length === 0)) {
-            setMessages([{ sender: 'ai', text: "Hello! I'm here to offer some guidance. How are you feeling today? You can write in your journal or log your state of mind to get started." }]);
-            return;
-        }
-
+        if (!user) return;
+        
         setLoading(true);
-        const moodsText = latestJournalData.moods.map((m: any) => m.mood).join(', ');
-        const feelingsText = latestJournalData.feelings.map((f: any) => `"${f.text}"`).join(', ');
 
+        const moodsText = latestJournalData.moods.map((m: any) => m.mood).join(', ') || 'Not logged';
+        const feelingsText = latestJournalData.feelings.map((f: any) => `"${f.text}"`).join(', ') || 'Not logged';
+        const entryText = latestJournalData.entry || 'Not logged';
+
+        // **FIX:** The prompt is now more direct and provides a fallback for the AI if no data is present.
         const prompt = `
-        You are an AI emotional support coach named "Guiding". Your role is to help the user with their emotional state and well-being.
-        Based on the user's latest journal data below, generate a thoughtful and supportive opening message.
+        You are an AI emotional support coach named "Guiding". Your primary function is to provide guidance based on the user's logged emotional state.
 
-        Your response should:
-        1.  Briefly summarize or reflect on their logged feelings and journal entry.
-        2.  Offer a piece of gentle, actionable advice or a comforting perspective.
-        3.  End with an open-ended question like "How does that sound?" or "Is there anything specific on your mind you'd like to explore further?".
+        **Your Task:**
+        Analyze the user's data provided below. Generate a thoughtful, supportive opening message that:
+        1.  Directly acknowledges one or two key feelings or themes from their logs.
+        2.  Offers a gentle, actionable piece of advice or a comforting perspective related to their logs.
+        3.  Ends with an open-ended question like "How are you feeling about this?" or "Is there anything specific on your mind right now?".
 
-        Keep your tone conversational, empathetic, and supportive.
+        **User's Emotional Data for Today:**
+        - **Moods Logged:** ${moodsText}
+        - **State of Mind Entries:** ${feelingsText}
+        - **Journal Entry:** "${entryText}"
 
-        User's Data:
-        - Moods Logged: "${moodsText || 'None'}"
-        - State of Mind Entries: ${feelingsText || 'None'}
-        - Journal Entry: "${latestJournalData.entry || 'None'}"
+        **IMPORTANT:**
+        - If all data fields say "Not logged", simply greet the user warmly and ask how their day is going, encouraging them to share what's on their mind.
+        - Do NOT say you cannot access their data. You MUST use the data provided above.
         `;
 
         try {
@@ -107,6 +108,8 @@ export const Guiding = () => {
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (text) {
                 setMessages([{ sender: 'ai', text: text.trim() }]);
+            } else {
+                 throw new Error("No text returned from API.");
             }
         } catch (error: any) {
             console.error("Failed to generate initial guide:", error);
@@ -126,16 +129,26 @@ export const Guiding = () => {
         setLoading(true);
 
         const conversationHistory = newMessages.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
-        const moodsText = latestJournalData.moods.map((m: any) => m.mood).join(', ');
-        const feelingsText = latestJournalData.feelings.map((f: any) => `"${f.text}"`).join(', ');
+        const moodsText = latestJournalData.moods.map((m: any) => m.mood).join(', ') || 'Not logged';
+        const feelingsText = latestJournalData.feelings.map((f: any) => `"${f.text}"`).join(', ') || 'Not logged';
+        const entryText = latestJournalData.entry || 'Not logged';
 
-        const prompt = `You are an AI emotional support coach called "Guiding". Your role is to help the user with their emotional state and well-being.
-        The user's states of mind today have been: ${feelingsText}, their journal entry is: "${latestJournalData.entry}", and their moods today have been: "${moodsText}".
-        Keep your responses supportive and focused on emotional well-being.
-        If the user asks for general information, planning, or anything not related to emotional support, gently redirect them to use the "Nyx" or "General AI" assistants.
-        Conversation history:
+        // **FIX:** This prompt is also more direct.
+        const prompt = `
+        You are an AI emotional support coach named "Guiding". Your role is to help the user with their emotional state and well-being based on the context of their day.
+
+        **Primary Context (User's Data for Today):**
+        - **Moods Logged:** ${moodsText}
+        - **State of Mind Entries:** ${feelingsText}
+        - **Journal Entry:** "${entryText}"
+
+        **Your Task:**
+        Respond to the user's latest message in the conversation history below. You MUST use the primary context above to inform your response. Keep your responses supportive, empathetic, and focused on emotional well-being. If the user asks for something unrelated to emotional support (like planning or general info), gently redirect them to the "Nyx" or "General AI" assistants.
+
+        **Conversation History:**
         ${conversationHistory}
-        Guiding:`;
+
+        **Guiding's Response:**`;
 
         try {
             const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
@@ -160,7 +173,6 @@ export const Guiding = () => {
     const handleOpen = () => {
         setIsOpen(true);
         setHasNewAdvice(false);
-        // Generate the guide only when opening the chat window.
         generateInitialGuide();
     }
 

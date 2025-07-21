@@ -11,7 +11,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from 'sonner';
-import { Smile, Zap, Frown, Angry, Brain, CloudLightning, RotateCw, BatteryLow, BedDouble } from 'lucide-react';
+import { 
+    Smile, Zap, Frown, Angry, Brain, CloudLightning, RotateCw, BatteryLow, BedDouble, 
+    Meh, HelpCircle, Shield, Wind, Leaf, Sun, Moon, Star, ThumbsUp, Coffee 
+} from 'lucide-react';
 
 export const MoodTracker = () => {
   const { user } = useAuth();
@@ -61,36 +64,45 @@ export const MoodTracker = () => {
   };
 
   const moodOptions = [
-    { mood: 'Happy', icon: <Smile className="w-8 h-8" />, color: "text-yellow-400" },
     { mood: 'Productive', icon: <Zap className="w-8 h-8" />, color: "text-green-400" },
     { mood: 'Focused', icon: <Brain className="w-8 h-8" />, color: "text-blue-400" },
+    { mood: 'Happy', icon: <Smile className="w-8 h-8" />, color: "text-yellow-400" },
+    { mood: 'Confident', icon: <Star className="w-8 h-8" />, color: "text-yellow-300" },
+    { mood: 'Okay', icon: <ThumbsUp className="w-8 h-8" />, color: "text-gray-400" },
+    { mood: 'Blank', icon: <Meh className="w-8 h-8" />, color: "text-gray-500" },
     { mood: 'Sad', icon: <Frown className="w-8 h-8" />, color: "text-indigo-400" },
     { mood: 'Stressed', icon: <CloudLightning className="w-8 h-8" />, color: "text-orange-400" },
-    { mood: 'Overthinking', icon: <RotateCw className="w-8 h-8" />, color: "text-purple-400" },
     { mood: 'Angry', icon: <Angry className="w-8 h-8" />, color: "text-red-500" },
+    { mood: 'Overthinking', icon: <RotateCw className="w-8 h-8" />, color: "text-purple-400" },
     { mood: 'Tired', icon: <BatteryLow className="w-8 h-8" />, color: "text-gray-400" },
     { mood: 'Unmotivated', icon: <BedDouble className="w-8 h-8" />, color: "text-pink-400" },
+    { mood: 'Confused', icon: <HelpCircle className="w-8 h-8" />, color: "text-orange-300" },
+    { mood: 'Anxious', icon: <Wind className="w-8 h-8" />, color: "text-teal-400" },
+    { mood: 'Calm', icon: <Leaf className="w-8 h-8" />, color: "text-green-300" },
+    { mood: 'Energetic', icon: <Sun className="w-8 h-8" />, color: "text-yellow-500" },
+    { mood: 'Peaceful', icon: <Moon className="w-8 h-8" />, color: "text-indigo-300" },
+    { mood: 'Caffeinated', icon: <Coffee className="w-8 h-8" />, color: "text-amber-600" },
   ];
 
   return (
     <Dialog open={showPrompt} onOpenChange={setShowPrompt}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-center text-2xl">How are you feeling?</DialogTitle>
+          <DialogTitle className="text-center text-2xl">How are you feeling right now?</DialogTitle>
           <DialogDescription className="text-center">
-            A quick check-in helps track your emotional state.
+            A quick check-in helps track your emotional state throughout the day.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-3 gap-4 py-4">
+        <div className="grid grid-cols-4 md:grid-cols-6 gap-2 md:gap-4 py-4">
           {moodOptions.map(({ mood, icon, color }) => (
             <Button
               key={mood}
               variant="outline"
-              className={`flex flex-col h-24 items-center justify-center gap-2 border-2 hover:border-primary ${color}`}
+              className={`flex flex-col h-20 md:h-24 items-center justify-center gap-2 border-2 hover:border-primary ${color}`}
               onClick={() => handleMoodLog(mood)}
             >
               {icon}
-              <span className="text-sm">{mood}</span>
+              <span className="text-xs md:text-sm">{mood}</span>
             </Button>
           ))}
         </div>
