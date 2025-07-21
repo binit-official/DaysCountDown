@@ -22,32 +22,36 @@ const ProgressDashboard = () => {
     const weeklyStartDate = subDays(now, 7);
     const monthlyStartDate = subDays(now, 30);
 
-    // Mood Data Fetching
-    const moodCollectionRef = collection(db, 'users', user.uid, 'moodEntries');
-    const moodQuery = query(moodCollectionRef, where('timestamp', '>=', Timestamp.fromDate(monthlyStartDate)));
-    const unsubscribeMood = onSnapshot(moodQuery, (querySnapshot) => {
-      const dailyCounts: { [key: string]: number } = {};
-      const weeklyCounts: { [key: string]: number } = {};
-      const monthlyCounts: { [key: string]: number } = {};
-      
-      querySnapshot.forEach(doc => {
-        const mood = doc.data().mood;
-        const timestamp = doc.data().timestamp.toDate();
+    // Journal/Mood Data Fetching
+    const journalCollectionRef = collection(db, 'users', user.uid, 'journal');
+    const journalQuery = query(journalCollectionRef, where('timestamp', '>=', Timestamp.fromDate(monthlyStartDate)));
+    const unsubscribeMood = onSnapshot(journalQuery, (querySnapshot) => {
+        const dailyCounts: { [key: string]: number } = {};
+        const weeklyCounts: { [key: string]: number } = {};
+        const monthlyCounts: { [key: string]: number } = {};
 
-        monthlyCounts[mood] = (monthlyCounts[mood] || 0) + 1;
-        if (timestamp >= weeklyStartDate) {
-          weeklyCounts[mood] = (weeklyCounts[mood] || 0) + 1;
-        }
-        if (timestamp >= dailyStartDate) {
-          dailyCounts[mood] = (dailyCounts[mood] || 0) + 1;
-        }
-      });
+        querySnapshot.forEach(doc => {
+            const dayData = doc.data();
+            if (dayData.moods && Array.isArray(dayData.moods)) {
+                dayData.moods.forEach((moodEntry: any) => {
+                    const mood = moodEntry.mood;
+                    const timestamp = moodEntry.timestamp.toDate();
 
-      setMoodData({
-        daily: Object.keys(dailyCounts).map(mood => ({ name: mood, count: dailyCounts[mood] })),
-        weekly: Object.keys(weeklyCounts).map(mood => ({ name: mood, count: weeklyCounts[mood] })),
-        monthly: Object.keys(monthlyCounts).map(mood => ({ name: mood, count: monthlyCounts[mood] })),
-      });
+                    monthlyCounts[mood] = (monthlyCounts[mood] || 0) + 1;
+                    if (timestamp >= weeklyStartDate) {
+                        weeklyCounts[mood] = (weeklyCounts[mood] || 0) + 1;
+                    }
+                    if (timestamp >= dailyStartDate) {
+                        dailyCounts[mood] = (dailyCounts[mood] || 0) + 1;
+                    }
+                });
+            }
+        });
+        setMoodData({
+            daily: Object.keys(dailyCounts).map(mood => ({ name: mood, count: dailyCounts[mood] })),
+            weekly: Object.keys(weeklyCounts).map(mood => ({ name: mood, count: weeklyCounts[mood] })),
+            monthly: Object.keys(monthlyCounts).map(mood => ({ name: mood, count: monthlyCounts[mood] })),
+        });
     });
 
     // Roadmap Data Fetching

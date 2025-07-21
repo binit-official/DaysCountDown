@@ -23,11 +23,11 @@ export const AICoach = () => {
     const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [latestJournalData, setLatestJournalData] = useState({ entry: '', mood: '', feelingText: ''});
+    const [latestJournalData, setLatestJournalData] = useState({ entry: '', moods: [], feelings: [] });
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [hasNewAdvice, setHasNewAdvice] = useState(false);
-    const prevMood = usePrevious(latestJournalData.mood);
+    const prevMoodsCount = usePrevious(latestJournalData.moods.length);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 
@@ -48,8 +48,8 @@ export const AICoach = () => {
                 const data = querySnapshot.docs[0].data();
                 setLatestJournalData({
                     entry: data.entry || '',
-                    mood: data.mood || '',
-                    feelingText: data.feelingText || ''
+                    moods: data.moods || [],
+                    feelings: data.feelings || []
                 });
             }
         });
@@ -60,18 +60,22 @@ export const AICoach = () => {
     }, [user]);
 
     useEffect(() => {
-        if (latestJournalData.mood && prevMood !== latestJournalData.mood) {
+        const hasNewMoods = latestJournalData.moods.length > 0 && prevMoodsCount !== latestJournalData.moods.length;
+        if (hasNewMoods) {
             generateAdvice();
         }
-    }, [latestJournalData.mood, prevMood]);
+    }, [latestJournalData.moods, prevMoodsCount]);
 
     const generateAdvice = async (isInitial = false) => {
         if (!user) return;
         setLoading(true);
+        
+        const moodsText = latestJournalData.moods.map((m: any) => m.mood).join(', ');
+        const feelingsText = latestJournalData.feelings.map((f: any) => `"${f.text}"`).join(', ');
 
         const prompt = isInitial
             ? `I'm checking in with my AI emotional support coach. Give me a brief, welcoming message and ask how I'm feeling today.`
-            : `Based on my latest state of mind, journal entry, and overall mood, provide some advice for today and tomorrow in a conversational and supportive tone. Keep the initial response concise.\n\nState of Mind: "${latestJournalData.feelingText}"\nJournal: "${latestJournalData.entry}"\nOverall Mood: "${latestJournalData.mood}"`;
+            : `Based on my recent feelings, journal entry, and overall moods, provide some advice for today and tomorrow in a conversational and supportive tone. Keep the initial response concise.\n\nMy States of Mind: ${feelingsText}\nJournal: "${latestJournalData.entry}"\nMy moods today have been: "${moodsText}"`;
 
         try {
             const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
@@ -105,41 +109,16 @@ export const AICoach = () => {
         setLoading(true);
 
         const conversationHistory = newMessages.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
+        const moodsText = latestJournalData.moods.map((m: any) => m.mood).join(', ');
+        const feelingsText = latestJournalData.feelings.map((f: any) => `"${f.text}"`).join(', ');
 
-       const prompt = `
-You are an AI emotional support coach — a compassionate, emotionally intelligent companion designed to help the user reflect, process, and navigate their inner world.
-
-🧠 User’s Latest Emotional Context:
-- Mood: "${latestJournalData.mood}"
-- State of Mind: "${latestJournalData.feelingText}"
-- Journal Entry: "${latestJournalData.entry}"
-
-🎯 Your Purpose:
-- Offer gentle, thoughtful, and deeply empathetic support.
-- Help the user explore their thoughts and emotions safely.
-- Encourage emotional clarity, growth, and grounded self-awareness.
-- Ask reflective questions when appropriate. Listen more than advise.
-
-🚫 You are NOT:
-- A task planner, productivity coach, or life strategist.
-- Nyx or the General AI. If the user asks about goals, tasks, information, or productivity, gently redirect them to use the correct assistant.
-
-🗣️ Tone:
-- Warm, validating, calming, and human-like.
-- Never cold, clinical, or overly robotic.
-- Prioritize emotional depth and understanding.
-
-⚠️ Behavior Rules:
-- Do not generate structured plans, code, or productivity suggestions.
-- Do not impersonate Nyx or the General AI.
-- Always remain focused on the user's emotional landscape.
-
-📚 Conversation History:
-${conversationHistory}
-
-Emotional Support AI:
-`;
-
+        const prompt = `You are an AI emotional support coach. Your role is to help the user with their emotional state and well-being.
+        The user's states of mind today have been: ${feelingsText}, their journal entry is: "${latestJournalData.entry}", and their moods today have been: "${moodsText}".
+        Keep your responses supportive and focused on emotional well-being.
+        If the user asks for general information, planning, or anything not related to emotional support, gently redirect them to use the "Nyx" or "General AI" assistants.
+        Conversation history:
+        ${conversationHistory}
+        AI Coach:`;
 
         try {
             const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {

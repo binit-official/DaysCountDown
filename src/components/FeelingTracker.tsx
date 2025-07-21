@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,7 @@ export const FeelingTracker = () => {
   const [feeling, setFeeling] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const analyzeAndSaveFeeling = async (feelingText: string) => {
+  const analyzeAndLogMood = async (feelingText: string) => {
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
     const journalDocRef = doc(db, 'users', user.uid, 'journal', today);
@@ -33,10 +33,9 @@ export const FeelingTracker = () => {
         const data = await response.json();
         const mood = data.candidates?.[0]?.content?.parts?.[0]?.text.trim() || 'Neutral';
 
-        // 2. Save the classified mood to the daily journal document
+        // 2. Save the classified mood to the daily journal document's moods array
         await setDoc(journalDocRef, { 
-            mood: mood,
-            timestamp: new Date()
+            moods: arrayUnion({ mood: mood, timestamp: new Date() })
         }, { merge: true });
 
         toast.success(`Emotional Stat Updated: ${mood}`);
@@ -51,18 +50,17 @@ export const FeelingTracker = () => {
     if (!user || !feeling.trim()) return;
     setLoading(true);
     
-    // Save the raw text feeling to the daily journal document
+    // Save the raw text feeling to the 'feelings' array in the daily journal document
     const today = new Date().toISOString().split('T')[0];
     const journalDocRef = doc(db, 'users', user.uid, 'journal', today);
     await setDoc(journalDocRef, { 
-        feelingText: feeling, 
-        timestamp: new Date() 
+        feelings: arrayUnion({ text: feeling, timestamp: new Date() })
     }, { merge: true });
     
-    toast.success('Your feeling has been recorded.');
+    toast.success('Your state of mind has been recorded.');
     
-    // Also analyze and save for stats
-    await analyzeAndSaveFeeling(feeling);
+    // Also analyze and save a categorized mood for stats
+    await analyzeAndLogMood(feeling);
 
     setFeeling('');
     setLoading(false);

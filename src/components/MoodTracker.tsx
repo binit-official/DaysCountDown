@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,15 +31,15 @@ export const MoodTracker = () => {
           setShowPrompt(true);
         }
       } else {
-        // If there are no entries ever for today, prompt them.
         setShowPrompt(true);
       }
     };
 
     const unsubscribe = onSnapshot(journalDocRef, (docSnap) => {
         let lastLogTime: Date | null = null;
-        if (docSnap.exists() && docSnap.data().timestamp) {
-            lastLogTime = docSnap.data().timestamp.toDate();
+        if (docSnap.exists() && docSnap.data().moods?.length > 0) {
+            const lastMood = docSnap.data().moods.slice(-1)[0];
+            lastLogTime = lastMood.timestamp.toDate();
         }
         checkMood(lastLogTime);
         if (!initialCheckComplete) setInitialCheckComplete(true);
@@ -54,8 +54,7 @@ export const MoodTracker = () => {
     const today = new Date().toISOString().split('T')[0];
     const journalDocRef = doc(db, 'users', user.uid, 'journal', today);
     await setDoc(journalDocRef, { 
-      mood: mood,
-      timestamp: new Date()
+      moods: arrayUnion({ mood: mood, timestamp: new Date() })
     }, { merge: true });
     toast.success(`Mood logged: ${mood}`);
     setShowPrompt(false);
