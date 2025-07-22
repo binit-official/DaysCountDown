@@ -9,6 +9,7 @@ import { Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { User } from 'firebase/auth';
 
+// ... (interfaces remain the same)
 interface DailyTask {
   day: number;
   task: string;
@@ -35,10 +36,12 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user }: AIPlannerProps) => {
   const [goal, setGoal] = useState('');
   const [days, setDays] = useState(45);
+  // ... (rest of the component is the same)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const generateRoadmap = async () => {
+    // ... (logic is the same)
     if (!goal || !days) {
         setError("A goal and number of days are required.");
         return;
@@ -115,13 +118,12 @@ const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user 
   };
 
   return (
-    // FIX: Increased padding and spacing for even more height
-    <Card className={cn("p-8 neon-border bg-card/90 backdrop-blur-sm", disabled && "opacity-50 pointer-events-none")}> 
-        <h3 className="text-lg font-bold mb-8 flex items-center">
+    <Card className={cn("p-6 neon-border bg-card/90 backdrop-blur-sm", disabled && "opacity-50 pointer-events-none")}>
+        <h3 className="text-lg font-bold mb-6 flex items-center">
             <Zap className="w-5 h-5 mr-2 text-primary" />
             AI Mission Planner
         </h3>
-        <div className="space-y-8">
+        <div className="space-y-6">
             <div>
                 <Label htmlFor="goal" className="text-muted-foreground">Your Goal</Label>
                 <Input
@@ -147,7 +149,7 @@ const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user 
                     disabled={disabled || loading}
                 />
             </div>
-            <Button onClick={generateRoadmap} disabled={disabled || loading} className="w-full cyberpunk-button !mt-12">
+            <Button onClick={generateRoadmap} disabled={disabled || loading} className="w-full cyberpunk-button !mt-8">
                 {loading ? 'Generating...' : 'Generate New Plan'}
             </Button>
             {error && <p className="mt-2 text-red-500 text-sm font-semibold">{error}</p>}

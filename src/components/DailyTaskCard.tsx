@@ -34,7 +34,6 @@ export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDa
         }));
         const allCompleted = subTasks.every((st: any) => st.completed);
 
-        // FIX: Check if the task has just been completed
         if (allCompleted && !wasPreviouslyComplete) {
             justCompletedTask = { ...task, subTasks, completed: allCompleted };
         }
@@ -42,7 +41,6 @@ export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDa
       }
       return task;
     });
-    // FIX: Pass the completed task object along with the update
     onRoadmapUpdate(updatedTasks, justCompletedTask);
   };
   

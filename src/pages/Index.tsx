@@ -11,7 +11,7 @@ import { Logo } from '@/components/Logo';
 import { UserNav } from '@/components/UserNav';
 import { Card } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction, collection, getDocs, documentId } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction, collection, getDocs } from 'firebase/firestore';
 import { AlertTriangle, Zap, Flame, Target } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { isToday, isYesterday, startOfWeek, endOfWeek, eachDayOfInterval, format, isWithinInterval } from 'date-fns';
@@ -34,13 +34,14 @@ const Index = () => {
     const [currentDay, setCurrentDay] = useState<number>(1);
     const [hasIncompleteTasks, setHasIncompleteTasks] = useState(false);
     const [allTasksCompleted, setAllTasksCompleted] = useState(false);
-    const [stats, setStats] = useState({ streak: 0, completedMissions: 0, totalStudyTime: 0 });
+    const [stats, setStats] = useState<any>(null);
     const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
     
     const [activeTimerDetails, setActiveTimerDetails] = useState<{ day: number; subTaskIndex: number; taskText: string; logs: StudyLog[] } | null>(null);
     const [timerIsActive, setTimerIsActive] = useState(false);
     const [sessionSeconds, setSessionSeconds] = useState(0);
     const sessionSecondsRef = useRef(sessionSeconds);
+    const initialCheckDone = useRef(false);
 
     useEffect(() => {
         sessionSecondsRef.current = sessionSeconds;
@@ -58,6 +59,50 @@ const Index = () => {
         };
     }, [timerIsActive]);
     
+    // FIX: Function is now correctly defined inside the component scope
+    const checkAllAchievementsOnLoad = async (currentStats: any, currentRoadmap: any) => {
+        if (!user || !currentRoadmap || !currentStats) return;
+        
+        const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+        const journalCollectionRef = collection(db, 'users', user.uid, 'journal');
+        const journalSnapshot = await getDocs(journalCollectionRef);
+        const journalCount = journalSnapshot.size;
+
+        const newAchievements = [...(currentStats.unlockedAchievements || [])];
+        let changed = false;
+
+        const addAchievement = (id: string) => {
+            if (!newAchievements.includes(id)) {
+                newAchievements.push(id);
+                const achievement = ALL_ACHIEVEMENTS.find(a => a.id === id);
+                if (achievement) toast.success(`Achievement Unlocked: ${achievement.name}!`);
+                changed = true;
+            }
+        };
+
+        if (currentRoadmap.days >= 30) addAchievement('roadmap_30_days');
+        if (currentStats.totalStudyTime >= 3600) addAchievement('study_1_hour');
+        if (currentStats.totalStudyTime >= 36000) addAchievement('study_10_hours');
+        if (currentStats.totalStudyTime >= 180000) addAchievement('study_50_hours');
+        if (currentStats.completedMissions >= 1) addAchievement('mission_1');
+        if (currentStats.completedMissions >= 5) addAchievement('mission_5');
+        if (currentStats.completedMissions >= 10) addAchievement('mission_10');
+        if (currentStats.completedMissions >= 25) addAchievement('mission_25');
+        if (currentStats.archivedTasks?.some((t: Task) => t.priority === 'extreme')) addAchievement('extreme_1');
+        if (currentStats.streak >= 3) addAchievement('streak_3');
+        if (currentStats.streak >= 7) addAchievement('streak_7');
+        if (currentStats.streak >= 30) addAchievement('streak_30');
+        if (currentStats.streak >= 100) addAchievement('streak_100');
+        if (journalCount >= 1) addAchievement('journal_1');
+        if (journalCount >= 7) addAchievement('journal_7_days');
+        const moodLogCount = journalSnapshot.docs.reduce((acc, doc) => acc + (doc.data().moods?.length || 0), 0);
+        if (moodLogCount >= 10) addAchievement('mood_10_logs');
+        
+        if (changed) {
+            await setDoc(statsDocRef, { unlockedAchievements: [...new Set(newAchievements)] }, { merge: true });
+        }
+    };
+    
     const handleStatEvent = async (eventType: string, data?: any) => {
         if (!user) return;
     
@@ -65,7 +110,7 @@ const Index = () => {
     
         await runTransaction(db, async (transaction) => {
             const statsDoc = await transaction.get(statsDocRef);
-            const currentStats = statsDoc.exists() ? statsDoc.data() : { unlockedAchievements: [], totalStudyTime: 0, moodLogCount: 0 };
+            const currentStats = statsDoc.exists() ? statsDoc.data() : { unlockedAchievements: [], moodLogCount: 0 };
             const newAchievements = [...(currentStats.unlockedAchievements || [])];
     
             const addAchievement = (id: string) => {
@@ -222,7 +267,7 @@ const Index = () => {
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [timerIsActive, activeTimerDetails, stats.totalStudyTime]);
+    }, [timerIsActive, activeTimerDetails, stats]);
 
     const handleOpenTimer = (day: number, subTaskIndex: number, taskText: string, logs: StudyLog[]) => {
         setActiveTimerDetails({ day, subTaskIndex, taskText, logs });
@@ -264,13 +309,23 @@ const Index = () => {
         if (roadmap?.dailyTasks && roadmap.startDate) {
             const day = calculateCurrentDay(roadmap.startDate);
             setCurrentDay(day);
-            setSelectedDay(day);
+            if (!selectedDay) setSelectedDay(day);
             const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
             setHasIncompleteTasks(incomplete);
             const allComplete = roadmap.dailyTasks.every((task: any) => task.completed);
             setAllTasksCompleted(allComplete);
         }
-    }, [roadmap]);
+    }, [roadmap, selectedDay]);
+    
+    useEffect(() => {
+        if (user && stats && roadmap && !loading && !initialCheckDone.current) {
+            const check = async () => {
+                await checkAllAchievementsOnLoad(stats, roadmap);
+                initialCheckDone.current = true;
+            };
+            check();
+        }
+    }, [user, stats, roadmap, loading]);
 
     useEffect(() => {
         if (!user) {
@@ -311,26 +366,22 @@ const Index = () => {
                         })) || [],
                     })) || [],
                 }));
-                
-                setRoadmap({ ...data, startDate: data.startDate.toDate(), dailyTasks: convertedDailyTasks });
+                const newRoadmap = { ...data, startDate: data.startDate.toDate(), dailyTasks: convertedDailyTasks };
+                setRoadmap(newRoadmap);
             } else {
                 setRoadmap(null);
             }
         });
 
         const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
-        const unsubscribeStats = onSnapshot(statsDocRef, async (docSnap) => {
+        const unsubscribeStats = onSnapshot(statsDocRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 const lastCompleted = data.lastCompleted?.toDate();
                 if (lastCompleted && !isToday(lastCompleted) && !isYesterday(lastCompleted)) {
-                    await updateDoc(statsDocRef, { streak: 0 });
+                    updateDoc(statsDocRef, { streak: 0 });
                 }
-                setStats({ 
-                    streak: data.streak || 0, 
-                    completedMissions: data.completedMissions || 0,
-                    totalStudyTime: data.totalStudyTime || 0,
-                });
+                setStats(data);
                 setUnlockedAchievements(data.unlockedAchievements || []);
             }
         });
@@ -340,7 +391,7 @@ const Index = () => {
             unsubscribeRoadmap();
             unsubscribeStats();
         };
-    }, [user, selectedTaskId]);
+    }, [user]);
 
     const selectedTask = tasks.find((task) => task.id === selectedTaskId) || null;
     const isNewUser = tasks.length === 0 && !loading;
@@ -447,11 +498,11 @@ const Index = () => {
         const newCompletedCount = (statsData.completedMissions || 0) + 1;
         
         const newAchievements = [...(statsData.unlockedAchievements || [])];
-        if (newCompletedCount >= 1 && !newAchievements.includes('mission_1')) newAchievements.push('mission_1');
-        if (newCompletedCount >= 5 && !newAchievements.includes('mission_5')) newAchievements.push('mission_5');
-        if (newCompletedCount >= 10 && !newAchievements.includes('mission_10')) newAchievements.push('mission_10');
-        if (newCompletedCount >= 25 && !newAchievements.includes('mission_25')) newAchievements.push('mission_25');
-        if (taskToArchive.priority === 'extreme' && !newAchievements.includes('extreme_1')) newAchievements.push('extreme_1');
+        if (newCompletedCount >= 1) newAchievements.push('mission_1');
+        if (newCompletedCount >= 5) newAchievements.push('mission_5');
+        if (newCompletedCount >= 10) newAchievements.push('mission_10');
+        if (newCompletedCount >= 25) newAchievements.push('mission_25');
+        if (taskToArchive.priority === 'extreme') newAchievements.push('extreme_1');
 
         await setDoc(statsDocRef, { 
             completedMissions: newCompletedCount,
@@ -462,7 +513,7 @@ const Index = () => {
         toast.success(`Mission "${taskToArchive.title}" archived!`);
     };
 
-    if (loading) {
+    if (loading || !stats) {
         return (
             <div className="min-h-screen flex items-center justify-center text-2xl font-bold text-primary">
                 <Zap className="w-8 h-8 mr-4 animate-spin" />
