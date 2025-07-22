@@ -1,5 +1,3 @@
-// src/components/AIPlanner.tsx
-
 import React, { useState } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -27,13 +25,14 @@ interface Roadmap {
 
 interface AIPlannerProps {
   onRoadmapChange: (roadmap: Roadmap) => void;
+  onRoadmapGenerate: (days: number) => void;
   disabled?: boolean;
   user: User | null;
 }
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-const AIPlanner = ({ onRoadmapChange, disabled = false, user }: AIPlannerProps) => {
+const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user }: AIPlannerProps) => {
   const [goal, setGoal] = useState('');
   const [days, setDays] = useState(45);
   const [loading, setLoading] = useState(false);
@@ -102,8 +101,8 @@ const AIPlanner = ({ onRoadmapChange, disabled = false, user }: AIPlannerProps) 
       };
 
       onRoadmapChange(newRoadmap);
+      onRoadmapGenerate(days);
 
-      // Save to user-specific document in Firestore
       const docRef = doc(db, 'users', user.uid, 'data', 'roadmap');
       await setDoc(docRef, newRoadmap, { merge: true });
 
@@ -116,12 +115,13 @@ const AIPlanner = ({ onRoadmapChange, disabled = false, user }: AIPlannerProps) 
   };
 
   return (
-    <Card className={cn("p-4 neon-border bg-card/90 backdrop-blur-sm", disabled && "opacity-50 pointer-events-none")}>
-        <h3 className="text-lg font-bold mb-4 flex items-center">
+    // FIX: Increased padding and spacing for even more height
+    <Card className={cn("p-8 neon-border bg-card/90 backdrop-blur-sm", disabled && "opacity-50 pointer-events-none")}> 
+        <h3 className="text-lg font-bold mb-8 flex items-center">
             <Zap className="w-5 h-5 mr-2 text-primary" />
             AI Mission Planner
         </h3>
-        <div className="space-y-4">
+        <div className="space-y-8">
             <div>
                 <Label htmlFor="goal" className="text-muted-foreground">Your Goal</Label>
                 <Input
@@ -129,8 +129,8 @@ const AIPlanner = ({ onRoadmapChange, disabled = false, user }: AIPlannerProps) 
                     type="text"
                     value={goal}
                     onChange={(e) => setGoal(e.target.value)}
-                    placeholder="Create an active mission first..."
-                    className="mt-1 neon-border bg-background/50"
+                    placeholder="e.g., Master React in 45 days"
+                    className="mt-2 neon-border bg-background/50"
                     disabled={disabled || loading}
                 />
             </div>
@@ -141,13 +141,13 @@ const AIPlanner = ({ onRoadmapChange, disabled = false, user }: AIPlannerProps) 
                     type="number"
                     value={days}
                     onChange={(e) => setDays(Number(e.target.value))}
-                    className="mt-1 neon-border bg-background/50"
+                    className="mt-2 neon-border bg-background/50"
                     min={1}
                     max={365}
                     disabled={disabled || loading}
                 />
             </div>
-            <Button onClick={generateRoadmap} disabled={disabled || loading} className="w-full cyberpunk-button">
+            <Button onClick={generateRoadmap} disabled={disabled || loading} className="w-full cyberpunk-button !mt-12">
                 {loading ? 'Generating...' : 'Generate New Plan'}
             </Button>
             {error && <p className="mt-2 text-red-500 text-sm font-semibold">{error}</p>}

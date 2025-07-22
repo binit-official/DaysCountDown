@@ -11,10 +11,10 @@ import { Logo } from '@/components/Logo';
 import { UserNav } from '@/components/UserNav';
 import { Card } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction, collection, getDocs, documentId } from 'firebase/firestore';
 import { AlertTriangle, Zap, Flame, Target } from 'lucide-react';
 import { Footer } from '@/components/Footer';
-import { isToday, isYesterday } from 'date-fns';
+import { isToday, isYesterday, startOfWeek, endOfWeek, eachDayOfInterval, format, isWithinInterval } from 'date-fns';
 import { toast } from 'sonner';
 import { DashboardStats } from '@/components/DashboardStats';
 import { Journal } from '@/components/Journal';
@@ -22,6 +22,7 @@ import { MoodTracker } from '@/components/MoodTracker';
 import { Guiding } from '@/components/Guiding';
 import { FeelingTracker } from '@/components/FeelingTracker';
 import { StudyTimer, StudyLog } from '@/components/StudyTimer';
+import { ALL_ACHIEVEMENTS } from '@/components/Achievements';
 
 const Index = () => {
     const { user } = useAuth();
@@ -56,6 +57,71 @@ const Index = () => {
             if (interval) clearInterval(interval);
         };
     }, [timerIsActive]);
+    
+    const handleStatEvent = async (eventType: string, data?: any) => {
+        if (!user) return;
+    
+        const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+    
+        await runTransaction(db, async (transaction) => {
+            const statsDoc = await transaction.get(statsDocRef);
+            const currentStats = statsDoc.exists() ? statsDoc.data() : { unlockedAchievements: [], totalStudyTime: 0, moodLogCount: 0 };
+            const newAchievements = [...(currentStats.unlockedAchievements || [])];
+    
+            const addAchievement = (id: string) => {
+                if (!newAchievements.includes(id)) {
+                    newAchievements.push(id);
+                    const achievement = ALL_ACHIEVEMENTS.find(a => a.id === id);
+                    if(achievement) toast.success(`Achievement Unlocked: ${achievement.name}!`);
+                }
+            };
+    
+            if (eventType === 'roadmap_generated' && data.days >= 30) {
+                addAchievement('roadmap_30_days');
+            }
+    
+            if (eventType === 'feedback_used') {
+                addAchievement('feedback_1');
+            }
+    
+            if (eventType === 'journal_saved') {
+                const journalCollectionRef = collection(db, 'users', user.uid, 'journal');
+                const journalSnapshot = await getDocs(journalCollectionRef);
+                const journalCount = journalSnapshot.size;
+    
+                if (journalCount >= 1) addAchievement('journal_1');
+                if (journalCount >= 7) addAchievement('journal_7_days');
+            }
+    
+            if (eventType === 'mood_logged') {
+                const newMoodCount = (currentStats.moodLogCount || 0) + 1;
+                transaction.set(statsDocRef, { moodLogCount: newMoodCount }, { merge: true });
+                if (newMoodCount >= 10) addAchievement('mood_10_logs');
+            }
+    
+            if (eventType === 'task_completed' && roadmap) {
+                const now = new Date();
+                if (now.getHours() < 8) addAchievement('early_bird');
+                if (now.getHours() >= 22) addAchievement('night_owl');
+                if (data.difficulty === 'Challenge') addAchievement('challenge_task_1');
+    
+                const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+                const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+                
+                const allTasksInWeek = roadmap.dailyTasks.filter((task: any) => {
+                    const taskDate = new Date(roadmap.startDate);
+                    taskDate.setDate(taskDate.getDate() + task.day - 1);
+                    return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
+                });
+
+                if (allTasksInWeek.length > 0 && allTasksInWeek.every((task:any) => task.completed)) {
+                    addAchievement('perfect_week');
+                }
+            }
+
+            transaction.set(statsDocRef, { unlockedAchievements: [...new Set(newAchievements)] }, { merge: true });
+        });
+    };
 
     const handleRoadmapUpdate = (newRoadmap: any) => {
         if (!user) return;
@@ -64,7 +130,6 @@ const Index = () => {
         setDoc(roadmapDocRef, newRoadmap, { merge: true });
     };
 
-    // FIX: A single, robust transaction to update roadmap and stats together
     const updateTasksAndStatsAtomically = async (day: number, subTaskIndex: number, newLog?: StudyLog, deleteLogId?: string, editLog?: {id: string, duration: number}) => {
         if (!user) return;
         
@@ -102,30 +167,30 @@ const Index = () => {
 
                 transaction.update(roadmapDocRef, { dailyTasks: updatedDailyTasks });
 
-                // Recalculate total study time from the updated roadmap to ensure accuracy
                 const newTotalStudyTime = updatedDailyTasks.reduce((total: number, task: any) => {
                     return total + (task.subTasks?.reduce((subTotal: number, sub: any) => subTotal + (sub.studyLogs?.reduce((logTotal: number, log: StudyLog) => logTotal + log.duration, 0) || 0), 0) || 0);
                 }, 0);
 
                 const currentStats = statsDoc.exists() ? statsDoc.data() : { unlockedAchievements: [] };
                 const newAchievements = [...(currentStats.unlockedAchievements || [])];
-                let achievementUnlocked = false;
+                
+                const addAchievement = (id: string) => {
+                    if (!newAchievements.includes(id)) {
+                        newAchievements.push(id);
+                        const achievement = ALL_ACHIEVEMENTS.find(a => a.id === id);
+                        if(achievement) toast.success(`Achievement Unlocked: ${achievement.name}!`);
+                    }
+                };
+                
+                if (newTotalStudyTime >= 3600) addAchievement('study_1_hour');
+                if (newTotalStudyTime >= 36000) addAchievement('study_10_hours');
+                if (newTotalStudyTime >= 180000) addAchievement('study_50_hours');
+                if (newLog && newLog.duration >= 7200) addAchievement('study_marathon');
 
-                if (newTotalStudyTime >= 3600 && !newAchievements.includes('study_1_hour')) {
-                    newAchievements.push('study_1_hour');
-                    toast.success("Achievement Unlocked: Focused Mind!");
-                    achievementUnlocked = true;
-                }
-                if (newTotalStudyTime >= 36000 && !newAchievements.includes('study_10_hours')) {
-                    newAchievements.push('study_10_hours');
-                    toast.success("Achievement Unlocked: Deep Worker!");
-                    achievementUnlocked = true;
-                }
-
-                const statsUpdate: any = { totalStudyTime: newTotalStudyTime };
-                if (achievementUnlocked) {
-                    statsUpdate.unlockedAchievements = [...new Set(newAchievements)];
-                }
+                const statsUpdate: any = { 
+                    totalStudyTime: newTotalStudyTime,
+                    unlockedAchievements: [...new Set(newAchievements)]
+                };
                 
                 transaction.set(statsDocRef, statsUpdate, { merge: true });
             });
@@ -146,7 +211,7 @@ const Index = () => {
         }
         return false;
     };
-
+    
     useEffect(() => {
         const handleBeforeUnload = () => {
             if (timerIsActive && sessionSecondsRef.current > 0) {
@@ -182,7 +247,7 @@ const Index = () => {
         const { day, subTaskIndex } = activeTimerDetails;
         updateTasksAndStatsAtomically(day, subTaskIndex, undefined, logId);
     };
-
+    
     useEffect(() => {
         const calculateCurrentDay = (startDate: Date | undefined) => {
             if (startDate && !isNaN(startDate.getTime())) {
@@ -295,26 +360,33 @@ const Index = () => {
 
         const lastCompletedDate = currentStats.lastCompleted?.toDate();
 
-        if (lastCompletedDate && isToday(lastCompletedDate)) {
-            return;
-        }
+        if (lastCompletedDate && isToday(lastCompletedDate)) return;
 
         const newStreak = (lastCompletedDate && isYesterday(lastCompletedDate))
             ? (currentStats.streak || 0) + 1
             : 1;
 
         const newAchievements = [...(currentStats.unlockedAchievements || [])];
-        if (newStreak >= 3 && !newAchievements.includes('streak_3')) newAchievements.push('streak_3');
-        if (newStreak >= 7 && !newAchievements.includes('streak_7')) newAchievements.push('streak_7');
+        const addAchievement = (id: string) => {
+            if (!newAchievements.includes(id)) {
+                newAchievements.push(id);
+                const achievement = ALL_ACHIEVEMENTS.find(a => a.id === id);
+                if(achievement) toast.success(`Achievement Unlocked: ${achievement.name}!`);
+            }
+        };
 
-        const newStats = {
+        if (newStreak >= 3) addAchievement('streak_3');
+        if (newStreak >= 7) addAchievement('streak_7');
+        if (newStreak >= 30) addAchievement('streak_30');
+        if (newStreak >= 100) addAchievement('streak_100');
+
+        await setDoc(statsDocRef, { 
             ...currentStats,
             streak: newStreak,
             lastCompleted: new Date(),
             unlockedAchievements: [...new Set(newAchievements)],
-        };
-
-        await setDoc(statsDocRef, newStats, { merge: true });
+        }, { merge: true });
+        
         toast.success(`🔥 Streak extended to ${newStreak} days!`);
     };
 
@@ -339,11 +411,13 @@ const Index = () => {
         }
     };
     
-    const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
+    const handleDailyTaskUpdate = async (updatedDailyTasks: any[], completedTask?: any) => {
         if (!user || !roadmap) return;
+    
         const wasAllTodayComplete = roadmap.dailyTasks
             .filter((t: any) => t.day === currentDay)
             .every((t: any) => t.completed);
+    
         const isAllTodayComplete = updatedDailyTasks
             .filter(t => t.day === currentDay)
             .every(t => t.completed);
@@ -352,6 +426,10 @@ const Index = () => {
             await checkStreaksAndAchievements();
         } else if (!isAllTodayComplete && wasAllTodayComplete) {
             await revertStreakForToday();
+        }
+
+        if (completedTask) {
+            handleStatEvent('task_completed', { difficulty: completedTask.difficulty });
         }
         
         handleRoadmapUpdate({ ...roadmap, dailyTasks: updatedDailyTasks }); 
@@ -365,15 +443,22 @@ const Index = () => {
         const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
         const docSnap = await getDoc(statsDocRef);
         const statsData = docSnap.exists() ? docSnap.data() : { completedMissions: 0, archivedTasks: [], unlockedAchievements: [] };
+        
         const newCompletedCount = (statsData.completedMissions || 0) + 1;
-        statsData.completedMissions = newCompletedCount;
-        statsData.archivedTasks = [...(statsData.archivedTasks || []), taskToArchive];
+        
+        const newAchievements = [...(statsData.unlockedAchievements || [])];
+        if (newCompletedCount >= 1 && !newAchievements.includes('mission_1')) newAchievements.push('mission_1');
+        if (newCompletedCount >= 5 && !newAchievements.includes('mission_5')) newAchievements.push('mission_5');
+        if (newCompletedCount >= 10 && !newAchievements.includes('mission_10')) newAchievements.push('mission_10');
+        if (newCompletedCount >= 25 && !newAchievements.includes('mission_25')) newAchievements.push('mission_25');
+        if (taskToArchive.priority === 'extreme' && !newAchievements.includes('extreme_1')) newAchievements.push('extreme_1');
 
-        if (newCompletedCount >= 1 && !statsData.unlockedAchievements.includes('mission_1')) statsData.unlockedAchievements.push('mission_1');
-        if (newCompletedCount >= 5 && !statsData.unlockedAchievements.includes('mission_5')) statsData.unlockedAchievements.push('mission_5');
-        if (taskToArchive.priority === 'extreme' && !statsData.unlockedAchievements.includes('extreme_1')) statsData.unlockedAchievements.push('extreme_1');
+        await setDoc(statsDocRef, { 
+            completedMissions: newCompletedCount,
+            archivedTasks: [...(statsData.archivedTasks || []), taskToArchive],
+            unlockedAchievements: [...new Set(newAchievements)] 
+        }, { merge: true });
 
-        await setDoc(statsDocRef, { ...statsData, unlockedAchievements: [...new Set(statsData.unlockedAchievements)] }, { merge: true });
         toast.success(`Mission "${taskToArchive.title}" archived!`);
     };
 
@@ -417,8 +502,8 @@ const Index = () => {
                         <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm">
                             <TaskManager tasks={tasks} onTasksChange={handleTasksChange} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId} onArchive={handleArchiveMission} />
                         </Card>
-                        <Journal />
-                        <AIPlanner onRoadmapChange={handleRoadmapUpdate} disabled={isNewUser} user={user} />
+                        <Journal onJournalSave={() => handleStatEvent('journal_saved')} />
+                        <AIPlanner onRoadmapChange={handleRoadmapUpdate} onRoadmapGenerate={(days) => handleStatEvent('roadmap_generated', { days })} disabled={isNewUser} user={user} />
                     </div>
                     <div className="lg:col-span-6 space-y-6">
                         <Card className="p-4 md:p-8 neon-border bg-card/90 backdrop-blur-sm">
@@ -443,7 +528,7 @@ const Index = () => {
                             onOpenTimer={handleOpenTimer}
                         />
                         <DashboardStats stats={stats} unlockedAchievements={unlockedAchievements} />
-                        <MoodTracker />
+                        <MoodTracker onMoodLog={() => handleStatEvent('mood_logged')} />
                         <Guiding />
                     </div>
                 </div>

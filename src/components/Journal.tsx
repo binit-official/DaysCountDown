@@ -8,7 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
-export const Journal = () => {
+interface JournalProps {
+  onJournalSave: () => void;
+}
+
+export const Journal = ({ onJournalSave }: JournalProps) => {
   const { user } = useAuth();
   const [entry, setEntry] = useState('');
   const [todaysEntry, setTodaysEntry] = useState('');
@@ -37,6 +41,7 @@ export const Journal = () => {
     await setDoc(journalDocRef, { entry: entry, timestamp: new Date() }, { merge: true });
     toast.success('Journal entry saved!');
     setIsEditing(false); 
+    onJournalSave(); // Notify parent
   };
   
   const handleCancelEdit = () => {

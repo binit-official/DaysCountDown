@@ -9,7 +9,7 @@ import { StudyLog } from './StudyTimer';
 interface DailyTaskCardProps {
   roadmap: any | null;
   selectedDay: number;
-  onRoadmapUpdate: (updatedTasks: any[]) => void;
+  onRoadmapUpdate: (updatedTasks: any[], completedTask?: any) => void;
   currentDay: number;
   onOpenTimer: (day: number, subTaskIndex: number, taskText: string, logs: StudyLog[]) => void;
 }
@@ -23,19 +23,27 @@ export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDa
   const startDate = roadmap.startDate ? (roadmap.startDate.toDate ? roadmap.startDate.toDate() : new Date(roadmap.startDate)) : new Date();
   
   const handleSubTaskCompletion = (day: number, subTaskIndex: number, completed: boolean) => {
+    let justCompletedTask: any = null;
     const updatedTasks = roadmap.dailyTasks.map((task: any) => {
       if (task.day === day) {
+        const wasPreviouslyComplete = task.completed;
         const subTasks = task.task.split(';').map((s: string, i: number) => ({
             text: s.trim(),
             completed: i === subTaskIndex ? completed : (task.subTasks?.[i]?.completed ?? false),
             studyLogs: task.subTasks?.[i]?.studyLogs ?? [],
         }));
         const allCompleted = subTasks.every((st: any) => st.completed);
+
+        // FIX: Check if the task has just been completed
+        if (allCompleted && !wasPreviouslyComplete) {
+            justCompletedTask = { ...task, subTasks, completed: allCompleted };
+        }
         return { ...task, subTasks, completed: allCompleted };
       }
       return task;
     });
-    onRoadmapUpdate(updatedTasks);
+    // FIX: Pass the completed task object along with the update
+    onRoadmapUpdate(updatedTasks, justCompletedTask);
   };
   
   const formatStudyTime = (logs: StudyLog[] | undefined) => {
