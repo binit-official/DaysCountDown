@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { MotivationalQuote } from '@/components/MotivationalQuote';
@@ -21,6 +21,7 @@ import { Journal } from '@/components/Journal';
 import { MoodTracker } from '@/components/MoodTracker';
 import { Guiding } from '@/components/Guiding';
 import { FeelingTracker } from '@/components/FeelingTracker';
+import { StudyTimer, StudyLog } from '@/components/StudyTimer';
 
 const Index = () => {
     const { user } = useAuth();
@@ -34,6 +35,113 @@ const Index = () => {
     const [allTasksCompleted, setAllTasksCompleted] = useState(false);
     const [stats, setStats] = useState({ streak: 0, completedMissions: 0, totalStudyTime: 0 });
     const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+    
+    // FIX: Lifted timer state for persistence
+    const [activeTimerDetails, setActiveTimerDetails] = useState<{ day: number; subTaskIndex: number; taskText: string; logs: StudyLog[] } | null>(null);
+    const [timerIsActive, setTimerIsActive] = useState(false);
+    const [timerElapsedSeconds, setTimerElapsedSeconds] = useState(0);
+
+    // FIX: Central timer logic that persists across components
+    useEffect(() => {
+        let interval: NodeJS.Timeout | null = null;
+        if (timerIsActive) {
+            interval = setInterval(() => {
+                setTimerElapsedSeconds(seconds => seconds + 1);
+            }, 1000);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [timerIsActive]);
+    
+    // ... (rest of the useEffects and functions)
+
+    const handleOpenTimer = (day: number, subTaskIndex: number, taskText: string, logs: StudyLog[]) => {
+        const totalLoggedTime = logs.reduce((acc, log) => acc + log.duration, 0);
+        setActiveTimerDetails({ day, subTaskIndex, taskText, logs });
+        setTimerElapsedSeconds(totalLoggedTime);
+        setTimerIsActive(false); // Timer starts in a paused state
+    };
+
+    const handleCloseTimer = () => {
+        if (timerIsActive) {
+            // If timer is active, pause it but keep details to resume later
+            setTimerIsActive(false);
+        }
+        setActiveTimerDetails(null);
+    };
+
+    const updateSubTasks = (day: number, subTaskIndex: number, newSubTaskData: object, newTotalStudyTime?: number) => {
+        if (!roadmap) return;
+        const updatedTasks = roadmap.dailyTasks.map((task: any) => {
+          if (task.day === day) {
+            const subTasks = task.task.split(';').map((s: string, i: number) => ({
+                text: s.trim(),
+                completed: task.subTasks?.[i]?.completed ?? false,
+                studyLogs: task.subTasks?.[i]?.studyLogs ?? [],
+            }));
+            subTasks[subTaskIndex] = { ...subTasks[subTaskIndex], ...newSubTaskData };
+            const allCompleted = subTasks.every((st: any) => st.completed);
+            return { ...task, subTasks, completed: allCompleted };
+          }
+          return task;
+        });
+        
+        const updatedRoadmap = { ...roadmap, dailyTasks: updatedTasks };
+
+        if (typeof newTotalStudyTime === 'number') {
+            checkStudyAchievements(newTotalStudyTime);
+            const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+            setDoc(statsDocRef, { totalStudyTime: newTotalStudyTime }, { merge: true });
+        }
+        
+        handleRoadmapUpdate(updatedRoadmap);
+    };
+
+    const handleSaveStudyLog = (duration: number) => {
+        if (!activeTimerDetails || !user) return;
+        const { day, subTaskIndex } = activeTimerDetails;
+
+        const newLog: StudyLog = { id: Date.now().toString(), duration, timestamp: new Date() };
+        const currentLogs = activeTimerDetails.logs || [];
+        const updatedLogs = [...currentLogs, newLog];
+        
+        const totalTimeForTask = updatedLogs.reduce((acc, log) => acc + log.duration, 0);
+        const newTotalStudyTime = stats.totalStudyTime + duration;
+
+        updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
+        setTimerElapsedSeconds(totalTimeForTask); // update timer display
+    };
+
+    const handleEditStudyLog = (logId: string, newDuration: number) => {
+        if (!activeTimerDetails || !user) return;
+        const { day, subTaskIndex, logs } = activeTimerDetails;
+        
+        let durationChange = 0;
+        const updatedLogs = logs.map(log => {
+            if (log.id === logId) {
+                durationChange = newDuration - log.duration;
+                return { ...log, duration: newDuration };
+            }
+            return log;
+        });
+
+        const newTotalStudyTime = stats.totalStudyTime + durationChange;
+        updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
+    };
+
+    const handleDeleteStudyLog = (logId: string) => {
+        if (!activeTimerDetails || !user) return;
+        const { day, subTaskIndex, logs } = activeTimerDetails;
+        
+        const logToDelete = logs.find(log => log.id === logId);
+        const durationChange = logToDelete ? -logToDelete.duration : 0;
+        const updatedLogs = logs.filter(log => log.id !== logId);
+
+        const newTotalStudyTime = stats.totalStudyTime + durationChange;
+        updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
+    };
+
 
     useEffect(() => {
         const calculateCurrentDay = (startDate: Date | undefined) => {
@@ -90,7 +198,6 @@ const Index = () => {
             if (docSnap.metadata.hasPendingWrites) return;
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                // FIX: Deeply convert all Firestore Timestamps in studyLogs back to JS Dates
                 const convertedDailyTasks = data.dailyTasks?.map((task: any) => ({
                     ...task,
                     subTasks: task.subTasks?.map((sub: any) => ({
@@ -158,13 +265,11 @@ const Index = () => {
         const newAchievements = [...(currentStats.unlockedAchievements || [])];
         let achievementUnlocked = false;
 
-        // 1 hour = 3600 seconds
         if (newTotalStudyTime >= 3600 && !newAchievements.includes('study_1_hour')) {
             newAchievements.push('study_1_hour');
             toast.success("Achievement Unlocked: Focused Mind!");
             achievementUnlocked = true;
         }
-        // 10 hours = 36000 seconds
         if (newTotalStudyTime >= 36000 && !newAchievements.includes('study_10_hours')) {
             newAchievements.push('study_10_hours');
             toast.success("Achievement Unlocked: Deep Worker!");
@@ -193,19 +298,6 @@ const Index = () => {
             await checkStreaksAndAchievements();
         } else if (!isAllTodayComplete && wasAllTodayComplete) {
             await revertStreakForToday();
-        }
-    
-        const oldTotalStudyTime = roadmap.dailyTasks.flat().reduce((acc: number, task: any) => acc + (task.subTasks?.reduce((subAcc: number, sub: any) => subAcc + (sub.studyTimeLogged || 0), 0) || 0), 0);
-        const newTotalStudyTime = updatedDailyTasks.flat().reduce((acc: number, task: any) => acc + (task.subTasks?.reduce((subAcc: number, sub: any) => subAcc + (sub.studyTimeLogged || 0), 0) || 0), 0);
-        
-        if (newTotalStudyTime > oldTotalStudyTime) {
-            const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
-            const docSnap = await getDoc(statsDocRef);
-            const currentTotal = docSnap.exists() ? (docSnap.data().totalStudyTime || 0) : 0;
-            const finalTotal = currentTotal + (newTotalStudyTime - oldTotalStudyTime);
-
-            await setDoc(statsDocRef, { totalStudyTime: finalTotal }, { merge: true });
-            await checkStudyAchievements(finalTotal);
         }
         
         handleRoadmapUpdate(updatedRoadmap); 
@@ -339,7 +431,13 @@ const Index = () => {
                         <MotivationalQuote />
                     </div>
                     <div className="lg:col-span-3 space-y-6">
-                        <DailyTaskCard roadmap={roadmap} selectedDay={selectedDay} onRoadmapUpdate={handleDailyTaskUpdate} currentDay={currentDay} />
+                        <DailyTaskCard 
+                            roadmap={roadmap} 
+                            selectedDay={selectedDay} 
+                            onRoadmapUpdate={handleDailyTaskUpdate} 
+                            currentDay={currentDay} 
+                            onOpenTimer={handleOpenTimer}
+                        />
                         <DashboardStats stats={stats} unlockedAchievements={unlockedAchievements} />
                         <MoodTracker />
                         <Guiding />
@@ -362,6 +460,20 @@ const Index = () => {
                 />
             </main>
             <Footer />
+
+            {activeTimerDetails && (
+                 <StudyTimer
+                    taskText={activeTimerDetails.taskText}
+                    elapsedSeconds={timerElapsedSeconds}
+                    isActive={timerIsActive}
+                    setIsActive={setTimerIsActive}
+                    studyLogs={activeTimerDetails.logs}
+                    onAddLog={handleSaveStudyLog}
+                    onEditLog={handleEditStudyLog}
+                    onDeleteLog={handleDeleteStudyLog}
+                    onClose={handleCloseTimer}
+                 />
+            )}
         </div>
     );
 };

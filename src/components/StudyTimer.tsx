@@ -13,6 +13,9 @@ export interface StudyLog {
 
 interface StudyTimerProps {
   taskText: string;
+  elapsedSeconds: number;
+  isActive: boolean;
+  setIsActive: (isActive: boolean) => void;
   studyLogs: StudyLog[];
   onAddLog: (duration: number) => void;
   onEditLog: (logId: string, newDuration: number) => void;
@@ -20,29 +23,25 @@ interface StudyTimerProps {
   onClose: () => void;
 }
 
-export const StudyTimer = ({ taskText, studyLogs, onAddLog, onDeleteLog, onEditLog, onClose }: StudyTimerProps) => {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isActive, setIsActive] = useState(false);
-  
-  // State for movability
+export const StudyTimer = ({ taskText, elapsedSeconds, isActive, setIsActive, studyLogs, onAddLog, onEditLog, onDeleteLog, onClose }: StudyTimerProps) => {
+  const [sessionSeconds, setSessionSeconds] = useState(0);
+
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const dragStartRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
   
-  // State for editing a log
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editMinutes, setEditMinutes] = useState('');
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isActive) {
-      interval = setInterval(() => setElapsedSeconds(seconds => seconds + 1), 1000);
+      interval = setInterval(() => setSessionSeconds(seconds => seconds + 1), 1000);
     }
     return () => { if (interval) clearInterval(interval); };
   }, [isActive]);
 
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    // FIX: Correctly store the initial mouse and element positions
     dragStartRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -55,7 +54,6 @@ export const StudyTimer = ({ taskText, studyLogs, onAddLog, onDeleteLog, onEditL
   const handleMouseMove = (e: globalThis.MouseEvent) => {
     if (isDragging && dragStartRef.current) {
       e.preventDefault();
-      // FIX: Calculate the new position based on the delta from the start position
       const dx = e.clientX - dragStartRef.current.startX;
       const dy = e.clientY - dragStartRef.current.startY;
       setPosition({
@@ -82,15 +80,15 @@ export const StudyTimer = ({ taskText, studyLogs, onAddLog, onDeleteLog, onEditL
   }, [isDragging]);
 
   const handleSaveAndClose = () => {
-    if (elapsedSeconds > 0) {
-      onAddLog(elapsedSeconds);
+    if (sessionSeconds > 0) {
+      onAddLog(sessionSeconds);
     }
     onClose();
   };
   
   const handleEditClick = (log: StudyLog) => {
     setEditingLogId(log.id);
-    setEditMinutes(Math.round(log.duration / 60).toString());
+    setEditMinutes(Math.floor(log.duration / 60).toString());
   };
   
   const handleSaveEdit = (logId: string) => {
@@ -132,18 +130,21 @@ export const StudyTimer = ({ taskText, studyLogs, onAddLog, onDeleteLog, onEditL
             <Button variant="ghost" size="icon" onClick={onClose} className="cursor-pointer h-8 w-8"><X /></Button>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4">
+            <div className="text-4xl md:text-5xl font-mono font-black text-muted-foreground">
+                Total: {formatTime(elapsedSeconds)}
+            </div>
             <div className="text-6xl font-mono font-black text-primary neon-text">
-            {formatTime(elapsedSeconds)}
+                +{formatTime(sessionSeconds)}
             </div>
             <div className="flex w-full gap-4">
-            <Button onClick={() => setIsActive(!isActive)} className="w-full cyberpunk-button">
-                {isActive ? <Pause className="mr-2" /> : <Play className="mr-2" />}
-                {isActive ? 'Pause' : 'Start'}
-            </Button>
-            <Button onClick={handleSaveAndClose} variant="outline" className="w-full">
-                <Save className="mr-2" />
-                Save & Close
-            </Button>
+                <Button onClick={() => setIsActive(!isActive)} className="w-full cyberpunk-button">
+                    {isActive ? <Pause className="mr-2" /> : <Play className="mr-2" />}
+                    {isActive ? 'Pause' : 'Start'}
+                </Button>
+                <Button onClick={handleSaveAndClose} variant="outline" className="w-full">
+                    <Save className="mr-2" />
+                    Save & Close
+                </Button>
             </div>
 
             {studyLogs && studyLogs.length > 0 && (
@@ -162,7 +163,8 @@ export const StudyTimer = ({ taskText, studyLogs, onAddLog, onDeleteLog, onEditL
                     ) : (
                         <>
                         <div className="flex flex-col">
-                            <span className="font-semibold">{Math.round(log.duration / 60)} minutes</span>
+                            {/* FIX: Precise time formatting for logs */}
+                            <span className="font-semibold">{formatTime(log.duration)}</span>
                             <span className="text-xs text-muted-foreground">{format(new Date(log.timestamp), 'MMM d, h:mm a')}</span>
                         </div>
                         <div className="flex items-center">
