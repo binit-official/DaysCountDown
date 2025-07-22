@@ -58,8 +58,7 @@ const Index = () => {
             if (interval) clearInterval(interval);
         };
     }, [timerIsActive]);
-    
-    // FIX: Function is now correctly defined inside the component scope
+
     const checkAllAchievementsOnLoad = async (currentStats: any, currentRoadmap: any) => {
         if (!user || !currentRoadmap || !currentStats) return;
         
@@ -293,6 +292,7 @@ const Index = () => {
         updateTasksAndStatsAtomically(day, subTaskIndex, undefined, logId);
     };
     
+    // FIX: This useEffect now correctly calculates and sets the current and selected day
     useEffect(() => {
         const calculateCurrentDay = (startDate: Date | undefined) => {
             if (startDate && !isNaN(startDate.getTime())) {
@@ -309,13 +309,13 @@ const Index = () => {
         if (roadmap?.dailyTasks && roadmap.startDate) {
             const day = calculateCurrentDay(roadmap.startDate);
             setCurrentDay(day);
-            if (!selectedDay) setSelectedDay(day);
+            setSelectedDay(day); // This ensures the view defaults to the current day
             const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
             setHasIncompleteTasks(incomplete);
             const allComplete = roadmap.dailyTasks.every((task: any) => task.completed);
             setAllTasksCompleted(allComplete);
         }
-    }, [roadmap, selectedDay]);
+    }, [roadmap]);
     
     useEffect(() => {
         if (user && stats && roadmap && !loading && !initialCheckDone.current) {
