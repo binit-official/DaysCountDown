@@ -24,6 +24,7 @@
     --input: 217 32% 17%;
     --ring: 170 100% 50%;
     --radius: 0.5rem;
+    --component-border: 170 100% 50%;
   }
 
   .solaris {
@@ -33,21 +34,22 @@
     --card-foreground: 30 50% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 30 50% 10%;
-    --primary: 30 95% 55%; /* Bright Orange */
+    --primary: 30 95% 55%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 45 85% 65%; /* Golden Yellow */
+    --secondary: 45 85% 65%;
     --secondary-foreground: 30 50% 10%;
     --muted: 30 50% 92%;
     --muted-foreground: 30 50% 40%;
-    --accent: 20 100% 60%; /* Warm Red */
+    --accent: 20 100% 60%;
     --accent-foreground: 30 50% 10%;
     --destructive: 0 90% 50%;
     --destructive-foreground: 0 0% 100%;
     --border: 30 50% 88%;
     --input: 30 50% 88%;
     --ring: 30 95% 55%;
+    --component-border: 30 95% 55%;
   }
-  
+
   .crimson {
     --background: 0 20% 8%;
     --foreground: 0 0% 98%;
@@ -55,19 +57,20 @@
     --card-foreground: 0 0% 95%;
     --popover: 0 20% 8%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 80% 60%; /* Blood Red */
+    --primary: 0 80% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 60% 50%; /* Darker Red */
+    --secondary: 0 60% 50%;
     --secondary-foreground: 0 0% 100%;
     --muted: 0 20% 18%;
     --muted-foreground: 0 0% 60%;
-    --accent: 0 100% 75%; /* Bright Crimson */
+    --accent: 0 100% 75%;
     --accent-foreground: 0 20% 8%;
     --destructive: 0 70% 45%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 20% 25%;
     --input: 0 20% 25%;
     --ring: 0 80% 60%;
+    --component-border: 0 100% 75%;
   }
 
   .abyss {
@@ -77,21 +80,22 @@
     --card-foreground: 220 20% 93%;
     --popover: 240 15% 5%;
     --popover-foreground: 220 20% 95%;
-    --primary: 210 100% 60%; /* Deep Sea Blue */
+    --primary: 210 100% 60%;
     --primary-foreground: 240 15% 5%;
-    --secondary: 250 80% 70%; /* Luminous Purple */
+    --secondary: 250 80% 70%;
     --secondary-foreground: 240 15% 5%;
     --muted: 240 15% 15%;
     --muted-foreground: 220 20% 60%;
-    --accent: 180 100% 50%; /* Bioluminescent Teal */
+    --accent: 180 100% 50%;
     --accent-foreground: 240 15% 5%;
     --destructive: 300 90% 60%;
     --destructive-foreground: 220 20% 95%;
     --border: 240 15% 20%;
     --input: 240 15% 20%;
     --ring: 210 100% 60%;
+    --component-border: 210 100% 60%;
   }
-  
+
   .forest {
     --background: 100 15% 8%;
     --foreground: 90 20% 95%;
@@ -99,21 +103,22 @@
     --card-foreground: 90 20% 93%;
     --popover: 100 15% 8%;
     --popover-foreground: 90 20% 95%;
-    --primary: 110 70% 45%; /* Emerald Green */
+    --primary: 110 70% 45%;
     --primary-foreground: 90 20% 95%;
-    --secondary: 80 40% 35%; /* Moss Green */
+    --secondary: 80 40% 35%;
     --secondary-foreground: 90 20% 95%;
     --muted: 100 15% 18%;
     --muted-foreground: 90 20% 60%;
-    --accent: 40 80% 60%; /* Goldenrod */
+    --accent: 40 80% 60%;
     --accent-foreground: 100 15% 8%;
     --destructive: 20 70% 45%;
     --destructive-foreground: 90 20% 95%;
     --border: 100 15% 22%;
     --input: 100 15% 22%;
     --ring: 110 70% 45%;
+    --component-border: 110 70% 45%;
   }
-  
+
   .synthwave {
     --background: 260 50% 6%;
     --foreground: 300 100% 95%;
@@ -121,46 +126,56 @@
     --card-foreground: 300 100% 93%;
     --popover: 260 50% 6%;
     --popover-foreground: 300 100% 95%;
-    --primary: 320 100% 70%; /* Neon Pink */
+    --primary: 320 100% 70%;
     --primary-foreground: 300 100% 95%;
-    --secondary: 180 100% 60%; /* Electric Cyan */
+    --secondary: 180 100% 60%;
     --secondary-foreground: 260 50% 6%;
     --muted: 260 50% 18%;
     --muted-foreground: 300 100% 80%;
-    --accent: 50 100% 70%; /* Sunset Orange */
+    --accent: 50 100% 70%;
     --accent-foreground: 260 50% 6%;
     --destructive: 0 100% 70%;
     --destructive-foreground: 300 100% 95%;
     --border: 260 50% 25%;
     --input: 260 50% 25%;
     --ring: 320 100% 70%;
+    --component-border: 320 100% 70%;
   }
-  
+
   .arctic {
     --background: 200 50% 98%;
     --foreground: 210 30% 10%;
-    --card: 200 50% 100%;
+    --card: 200 50% 96%;
     --card-foreground: 210 30% 10%;
     --popover: 200 50% 100%;
     --popover-foreground: 210 30% 10%;
-    --primary: 210 100% 50%; /* Ice Blue */
+    --primary: 210 100% 50%;
     --primary-foreground: 200 50% 98%;
-    --secondary: 190 80% 70%; /* Glacial Aqua */
+    --secondary: 190 80% 70%;
     --secondary-foreground: 210 30% 10%;
     --muted: 200 50% 90%;
     --muted-foreground: 210 30% 40%;
-    --accent: 220 100% 60%; /* Frost Purple */
+    --accent: 220 100% 60%;
     --accent-foreground: 200 50% 98%;
     --destructive: 0 80% 50%;
     --destructive-foreground: 200 50% 98%;
-    --border: 200 50% 85%;
-    --input: 200 50% 85%;
+    --border: 200 20% 75%;
+    --input: 200 20% 75%;
     --ring: 210 100% 50%;
+    --component-border: 210 100% 50%;
   }
 
   body {
     @apply bg-background text-foreground font-mono;
     background: radial-gradient(ellipse at center, hsl(var(--background)), hsl(222 84% 2%));
     min-height: 100vh;
+  }
+
+  * {
+    border-color: hsl(var(--component-border));
+  }
+
+  .card, .button, .input, .popover, .modal {
+    border: 1px solid hsl(var(--component-border));
   }
 }
