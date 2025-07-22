@@ -90,7 +90,19 @@ const Index = () => {
             if (docSnap.metadata.hasPendingWrites) return;
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                setRoadmap({ ...data, startDate: data.startDate.toDate() });
+                // FIX: Deeply convert all Firestore Timestamps in studyLogs back to JS Dates
+                const convertedDailyTasks = data.dailyTasks?.map((task: any) => ({
+                    ...task,
+                    subTasks: task.subTasks?.map((sub: any) => ({
+                        ...sub,
+                        studyLogs: sub.studyLogs?.map((log: any) => ({
+                            ...log,
+                            timestamp: log.timestamp.toDate(),
+                        })) || [],
+                    })) || [],
+                }));
+                
+                setRoadmap({ ...data, startDate: data.startDate.toDate(), dailyTasks: convertedDailyTasks });
             } else {
                 setRoadmap(null);
             }
@@ -183,7 +195,6 @@ const Index = () => {
             await revertStreakForToday();
         }
     
-        // Calculate total study time and check for achievements
         const oldTotalStudyTime = roadmap.dailyTasks.flat().reduce((acc: number, task: any) => acc + (task.subTasks?.reduce((subAcc: number, sub: any) => subAcc + (sub.studyTimeLogged || 0), 0) || 0), 0);
         const newTotalStudyTime = updatedDailyTasks.flat().reduce((acc: number, task: any) => acc + (task.subTasks?.reduce((subAcc: number, sub: any) => subAcc + (sub.studyTimeLogged || 0), 0) || 0), 0);
         
@@ -197,7 +208,6 @@ const Index = () => {
             await checkStudyAchievements(finalTotal);
         }
         
-        // This will trigger the onSnapshot listener to update the local state
         handleRoadmapUpdate(updatedRoadmap); 
     };
 
