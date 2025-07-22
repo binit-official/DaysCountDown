@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, MouseEvent } from 'react';
+import React, { useState, MouseEvent, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Play, Pause, Save, X, Trash2, Edit } from 'lucide-react';
@@ -13,17 +13,18 @@ export interface StudyLog {
 
 interface StudyTimerProps {
   taskText: string;
-  elapsedSeconds: number; // This is the total time including the current session
+  elapsedSeconds: number;
+  totalLoggedTime: number;
   isActive: boolean;
   setIsActive: (isActive: boolean) => void;
   studyLogs: StudyLog[];
-  onSaveSession: () => boolean; // Returns true if a save occurred
+  onSaveSession: () => boolean;
   onEditLog: (logId: string, newDuration: number) => void;
   onDeleteLog: (logId: string) => void;
   onClose: () => void;
 }
 
-export const StudyTimer = ({ taskText, elapsedSeconds, isActive, setIsActive, studyLogs, onSaveSession, onEditLog, onDeleteLog, onClose }: StudyTimerProps) => {
+export const StudyTimer = ({ taskText, elapsedSeconds, totalLoggedTime, isActive, setIsActive, studyLogs, onSaveSession, onEditLog, onDeleteLog, onClose }: StudyTimerProps) => {
     const [isDragging, setIsDragging] = useState(false);
     const [position, setPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
     const dragStartRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
@@ -86,6 +87,8 @@ export const StudyTimer = ({ taskText, elapsedSeconds, isActive, setIsActive, st
         const seconds = totalSeconds % 60;
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
+    
+    const displayedTime = totalLoggedTime + elapsedSeconds;
 
     return (
         <div style={{ position: 'fixed', top: `${position.y}px`, left: `${position.x}px`, transform: `translate(-50%, -50%)` }} className="z-50 w-[90vw] max-w-md">
@@ -95,12 +98,11 @@ export const StudyTimer = ({ taskText, elapsedSeconds, isActive, setIsActive, st
                         <CardTitle>Focus Session</CardTitle>
                         <CardDescription className="truncate pt-1">Task: {taskText}</CardDescription>
                     </div>
-                    {/* FIX: Correctly call the onClose prop */}
                     <Button variant="ghost" size="icon" onClick={onClose} className="cursor-pointer h-8 w-8"><X /></Button>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center gap-4">
                     <div className="text-6xl font-mono font-black text-primary neon-text">
-                        {formatTime(elapsedSeconds)}
+                        {formatTime(displayedTime)}
                     </div>
                     <div className="flex w-full gap-4">
                         <Button onClick={() => setIsActive(!isActive)} className="w-full cyberpunk-button">

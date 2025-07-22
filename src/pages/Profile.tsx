@@ -1,5 +1,3 @@
-// src/pages/Profile.tsx
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext.tsx';
 import { getAuth, updateProfile } from 'firebase/auth';
@@ -11,16 +9,23 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { Achievements, ALL_ACHIEVEMENTS } from '@/components/Achievements';
+import { Achievements } from '@/components/Achievements';
 import { Task } from '@/components/TaskManager';
 import { format } from 'date-fns';
+
+const formatStudyTime = (totalSeconds: number) => {
+    if(!totalSeconds) return "0h 0m";
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+};
 
 const Profile = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState({ streak: 0, completedMissions: 0 });
+  const [stats, setStats] = useState({ streak: 0, completedMissions: 0, totalStudyTime: 0 });
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [archivedTasks, setArchivedTasks] = useState<Task[]>([]);
 
@@ -30,7 +35,11 @@ const Profile = () => {
     const unsubscribe = onSnapshot(statsDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setStats({ streak: data.streak || 0, completedMissions: data.completedMissions || 0 });
+        setStats({ 
+            streak: data.streak || 0, 
+            completedMissions: data.completedMissions || 0,
+            totalStudyTime: data.totalStudyTime || 0
+        });
         setUnlockedAchievements(data.unlockedAchievements || []);
         setArchivedTasks(data.archivedTasks?.map((t: any) => ({...t, targetDate: t.targetDate.toDate()})) || []);
       }
@@ -63,7 +72,7 @@ const Profile = () => {
             <CardHeader>
               <CardTitle>Your Stats</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground">Current Streak</p>
                 <p className="text-3xl font-bold">{stats.streak} Days</p>
@@ -71,6 +80,10 @@ const Profile = () => {
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground">Missions Completed</p>
                 <p className="text-3xl font-bold">{stats.completedMissions}</p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Total Study Time</p>
+                <p className="text-3xl font-bold">{formatStudyTime(stats.totalStudyTime)}</p>
               </div>
             </CardContent>
           </Card>

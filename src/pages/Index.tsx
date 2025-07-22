@@ -11,7 +11,7 @@ import { Logo } from '@/components/Logo';
 import { UserNav } from '@/components/UserNav';
 import { Card } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { AlertTriangle, Zap, Flame, Target } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { isToday, isYesterday } from 'date-fns';
@@ -35,8 +35,7 @@ const Index = () => {
     const [allTasksCompleted, setAllTasksCompleted] = useState(false);
     const [stats, setStats] = useState({ streak: 0, completedMissions: 0, totalStudyTime: 0 });
     const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
-
-    // Timer state lifted for persistence and focus mode
+    
     const [activeTimerDetails, setActiveTimerDetails] = useState<{ day: number; subTaskIndex: number; taskText: string; logs: StudyLog[] } | null>(null);
     const [timerIsActive, setTimerIsActive] = useState(false);
     const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -65,67 +64,82 @@ const Index = () => {
         setDoc(roadmapDocRef, newRoadmap, { merge: true });
     };
 
-    const checkStudyAchievements = async (newTotalStudyTime: number) => {
+    // FIX: A single, robust transaction to update roadmap and stats together
+    const updateTasksAndStatsAtomically = async (day: number, subTaskIndex: number, newLog?: StudyLog, deleteLogId?: string, editLog?: {id: string, duration: number}) => {
         if (!user) return;
         
+        const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
         const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
-        const docSnap = await getDoc(statsDocRef);
-        const currentStats = docSnap.exists() ? docSnap.data() : { unlockedAchievements: [], totalStudyTime: 0 };
-        const newAchievements = [...(currentStats.unlockedAchievements || [])];
-        let achievementUnlocked = false;
 
-        if (newTotalStudyTime >= 3600 && !newAchievements.includes('study_1_hour')) {
-            newAchievements.push('study_1_hour');
-            toast.success("Achievement Unlocked: Focused Mind!");
-            achievementUnlocked = true;
-        }
-        if (newTotalStudyTime >= 36000 && !newAchievements.includes('study_10_hours')) {
-            newAchievements.push('study_10_hours');
-            toast.success("Achievement Unlocked: Deep Worker!");
-            achievementUnlocked = true;
-        }
+        try {
+            await runTransaction(db, async (transaction) => {
+                const roadmapDoc = await transaction.get(roadmapDocRef);
+                const statsDoc = await transaction.get(statsDocRef);
 
-        if (achievementUnlocked) {
-            await setDoc(statsDocRef, { unlockedAchievements: [...new Set(newAchievements)] }, { merge: true });
-        }
-    };
-    
-    const updateSubTasks = (day: number, subTaskIndex: number, newSubTaskData: object, newTotalStudyTime?: number) => {
-        if (!roadmap || !user) return;
-        const updatedTasks = roadmap.dailyTasks.map((task: any) => {
-          if (task.day === day) {
-            const subTasks = task.task.split(';').map((s: string, i: number) => ({
-                text: s.trim(),
-                completed: task.subTasks?.[i]?.completed ?? false,
-                studyLogs: task.subTasks?.[i]?.studyLogs ?? [],
-            }));
-            subTasks[subTaskIndex] = { ...subTasks[subTaskIndex], ...newSubTaskData };
-            const allCompleted = subTasks.every((st: any) => st.completed);
-            return { ...task, subTasks, completed: allCompleted };
-          }
-          return task;
-        });
-        
-        const updatedRoadmap = { ...roadmap, dailyTasks: updatedTasks };
+                if (!roadmapDoc.exists()) throw "Roadmap does not exist!";
+                
+                const currentRoadmap = roadmapDoc.data();
+                const updatedDailyTasks = currentRoadmap.dailyTasks.map((task: any) => {
+                    if (task.day === day) {
+                        const subTasks = task.task.split(';').map((s: string, i: number) => ({
+                            text: s.trim(),
+                            completed: task.subTasks?.[i]?.completed ?? false,
+                            studyLogs: task.subTasks?.[i]?.studyLogs ?? [],
+                        }));
+                        
+                        let currentLogs = subTasks[subTaskIndex].studyLogs || [];
+                        if (newLog) currentLogs.push(newLog);
+                        if (deleteLogId) currentLogs = currentLogs.filter((log: StudyLog) => log.id !== deleteLogId);
+                        if (editLog) {
+                            currentLogs = currentLogs.map((log: StudyLog) => log.id === editLog.id ? {...log, duration: editLog.duration} : log);
+                        }
+                        
+                        subTasks[subTaskIndex].studyLogs = currentLogs;
+                        return { ...task, subTasks };
+                    }
+                    return task;
+                });
 
-        if (typeof newTotalStudyTime === 'number') {
-            checkStudyAchievements(newTotalStudyTime);
-            const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
-            setDoc(statsDocRef, { totalStudyTime: newTotalStudyTime }, { merge: true });
+                transaction.update(roadmapDocRef, { dailyTasks: updatedDailyTasks });
+
+                // Recalculate total study time from the updated roadmap to ensure accuracy
+                const newTotalStudyTime = updatedDailyTasks.reduce((total: number, task: any) => {
+                    return total + (task.subTasks?.reduce((subTotal: number, sub: any) => subTotal + (sub.studyLogs?.reduce((logTotal: number, log: StudyLog) => logTotal + log.duration, 0) || 0), 0) || 0);
+                }, 0);
+
+                const currentStats = statsDoc.exists() ? statsDoc.data() : { unlockedAchievements: [] };
+                const newAchievements = [...(currentStats.unlockedAchievements || [])];
+                let achievementUnlocked = false;
+
+                if (newTotalStudyTime >= 3600 && !newAchievements.includes('study_1_hour')) {
+                    newAchievements.push('study_1_hour');
+                    toast.success("Achievement Unlocked: Focused Mind!");
+                    achievementUnlocked = true;
+                }
+                if (newTotalStudyTime >= 36000 && !newAchievements.includes('study_10_hours')) {
+                    newAchievements.push('study_10_hours');
+                    toast.success("Achievement Unlocked: Deep Worker!");
+                    achievementUnlocked = true;
+                }
+
+                const statsUpdate: any = { totalStudyTime: newTotalStudyTime };
+                if (achievementUnlocked) {
+                    statsUpdate.unlockedAchievements = [...new Set(newAchievements)];
+                }
+                
+                transaction.set(statsDocRef, statsUpdate, { merge: true });
+            });
+        } catch (e) {
+            console.error("Transaction failed: ", e);
+            toast.error("Failed to save session. Please try again.");
         }
-        
-        handleRoadmapUpdate(updatedRoadmap);
     };
 
     const handleSaveSession = () => {
-        if (sessionSecondsRef.current > 0 && activeTimerDetails && user) {
-            const { day, subTaskIndex, logs } = activeTimerDetails;
+        if (sessionSecondsRef.current > 0 && activeTimerDetails) {
+            const { day, subTaskIndex } = activeTimerDetails;
             const newLog: StudyLog = { id: Date.now().toString(), duration: sessionSecondsRef.current, timestamp: new Date() };
-            const updatedLogs = [...logs, newLog];
-
-            const newTotalStudyTime = stats.totalStudyTime + sessionSecondsRef.current;
-            updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
-            
+            updateTasksAndStatsAtomically(day, subTaskIndex, newLog);
             setSessionSeconds(0);
             sessionSecondsRef.current = 0;
             return true;
@@ -134,7 +148,7 @@ const Index = () => {
     };
 
     useEffect(() => {
-        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+        const handleBeforeUnload = () => {
             if (timerIsActive && sessionSecondsRef.current > 0) {
                 handleSaveSession();
             }
@@ -156,36 +170,19 @@ const Index = () => {
         }
         setActiveTimerDetails(null);
     };
-
+    
     const handleEditStudyLog = (logId: string, newDuration: number) => {
-        if (!activeTimerDetails || !user) return;
-        const { day, subTaskIndex, logs } = activeTimerDetails;
-        
-        let durationChange = 0;
-        const updatedLogs = logs.map(log => {
-            if (log.id === logId) {
-                durationChange = newDuration - log.duration;
-                return { ...log, duration: newDuration };
-            }
-            return log;
-        });
-
-        const newTotalStudyTime = stats.totalStudyTime + durationChange;
-        updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
+        if (!activeTimerDetails) return;
+        const { day, subTaskIndex } = activeTimerDetails;
+        updateTasksAndStatsAtomically(day, subTaskIndex, undefined, undefined, {id: logId, duration: newDuration});
     };
 
     const handleDeleteStudyLog = (logId: string) => {
-        if (!activeTimerDetails || !user) return;
-        const { day, subTaskIndex, logs } = activeTimerDetails;
-        
-        const logToDelete = logs.find(log => log.id === logId);
-        const durationChange = logToDelete ? -logToDelete.duration : 0;
-        const updatedLogs = logs.filter(log => log.id !== logId);
-
-        const newTotalStudyTime = stats.totalStudyTime + durationChange;
-        updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
+        if (!activeTimerDetails) return;
+        const { day, subTaskIndex } = activeTimerDetails;
+        updateTasksAndStatsAtomically(day, subTaskIndex, undefined, logId);
     };
-    
+
     useEffect(() => {
         const calculateCurrentDay = (startDate: Date | undefined) => {
             if (startDate && !isNaN(startDate.getTime())) {
@@ -203,10 +200,8 @@ const Index = () => {
             const day = calculateCurrentDay(roadmap.startDate);
             setCurrentDay(day);
             setSelectedDay(day);
-
             const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
             setHasIncompleteTasks(incomplete);
-
             const allComplete = roadmap.dailyTasks.every((task: any) => task.completed);
             setAllTasksCompleted(allComplete);
         }
@@ -296,24 +291,24 @@ const Index = () => {
         if (!user) return;
         const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
         const docSnap = await getDoc(statsDocRef);
-        const stats = docSnap.exists() ? docSnap.data() : { streak: 0, lastCompleted: null, unlockedAchievements: [] };
+        const currentStats = docSnap.exists() ? docSnap.data() : { streak: 0, lastCompleted: null, unlockedAchievements: [] };
 
-        const lastCompletedDate = stats.lastCompleted?.toDate();
+        const lastCompletedDate = currentStats.lastCompleted?.toDate();
 
         if (lastCompletedDate && isToday(lastCompletedDate)) {
             return;
         }
 
         const newStreak = (lastCompletedDate && isYesterday(lastCompletedDate))
-            ? (stats.streak || 0) + 1
+            ? (currentStats.streak || 0) + 1
             : 1;
 
-        const newAchievements = [...(stats.unlockedAchievements || [])];
+        const newAchievements = [...(currentStats.unlockedAchievements || [])];
         if (newStreak >= 3 && !newAchievements.includes('streak_3')) newAchievements.push('streak_3');
         if (newStreak >= 7 && !newAchievements.includes('streak_7')) newAchievements.push('streak_7');
 
         const newStats = {
-            ...stats,
+            ...currentStats,
             streak: newStreak,
             lastCompleted: new Date(),
             unlockedAchievements: [...new Set(newAchievements)],
@@ -329,18 +324,16 @@ const Index = () => {
         const docSnap = await getDoc(statsDocRef);
         if (!docSnap.exists()) return;
 
-        const stats = docSnap.data();
-        const lastCompletedDate = stats.lastCompleted?.toDate();
+        const currentStats = docSnap.data();
+        const lastCompletedDate = currentStats.lastCompleted?.toDate();
 
         if (lastCompletedDate && isToday(lastCompletedDate)) {
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
-
-            const newStreak = (stats.streak || 1) - 1;
-
+            const newStreak = (currentStats.streak || 1) - 1;
             await updateDoc(statsDocRef, {
                 streak: newStreak,
-                lastCompleted: stats.streak > 1 ? yesterday : null
+                lastCompleted: currentStats.streak > 1 ? yesterday : null
             });
             toast.info("Streak reverted for today.");
         }
@@ -348,13 +341,9 @@ const Index = () => {
     
     const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
         if (!user || !roadmap) return;
-    
         const wasAllTodayComplete = roadmap.dailyTasks
             .filter((t: any) => t.day === currentDay)
             .every((t: any) => t.completed);
-    
-        const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
-    
         const isAllTodayComplete = updatedDailyTasks
             .filter(t => t.day === currentDay)
             .every(t => t.completed);
@@ -365,7 +354,7 @@ const Index = () => {
             await revertStreakForToday();
         }
         
-        handleRoadmapUpdate(updatedRoadmap); 
+        handleRoadmapUpdate({ ...roadmap, dailyTasks: updatedDailyTasks }); 
     };
 
     const handleArchiveMission = async (taskToArchive: Task) => {
@@ -375,18 +364,16 @@ const Index = () => {
 
         const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
         const docSnap = await getDoc(statsDocRef);
-        const stats = docSnap.exists() ? docSnap.data() : { completedMissions: 0, archivedTasks: [], unlockedAchievements: [] };
+        const statsData = docSnap.exists() ? docSnap.data() : { completedMissions: 0, archivedTasks: [], unlockedAchievements: [] };
+        const newCompletedCount = (statsData.completedMissions || 0) + 1;
+        statsData.completedMissions = newCompletedCount;
+        statsData.archivedTasks = [...(statsData.archivedTasks || []), taskToArchive];
 
-        const newCompletedCount = (stats.completedMissions || 0) + 1;
-        stats.completedMissions = newCompletedCount;
-        stats.archivedTasks = [...(stats.archivedTasks || []), taskToArchive];
+        if (newCompletedCount >= 1 && !statsData.unlockedAchievements.includes('mission_1')) statsData.unlockedAchievements.push('mission_1');
+        if (newCompletedCount >= 5 && !statsData.unlockedAchievements.includes('mission_5')) statsData.unlockedAchievements.push('mission_5');
+        if (taskToArchive.priority === 'extreme' && !statsData.unlockedAchievements.includes('extreme_1')) statsData.unlockedAchievements.push('extreme_1');
 
-        if (newCompletedCount >= 1 && !stats.unlockedAchievements.includes('mission_1')) stats.unlockedAchievements.push('mission_1');
-        if (newCompletedCount >= 5 && !stats.unlockedAchievements.includes('mission_5')) stats.unlockedAchievements.push('mission_5');
-        if (taskToArchive.priority === 'extreme' && !stats.unlockedAchievements.includes('extreme_1')) stats.unlockedAchievements.push('extreme_1');
-
-        await setDoc(statsDocRef, { ...stats, unlockedAchievements: [...new Set(stats.unlockedAchievements)] }, { merge: true });
-
+        await setDoc(statsDocRef, { ...statsData, unlockedAchievements: [...new Set(statsData.unlockedAchievements)] }, { merge: true });
         toast.success(`Mission "${taskToArchive.title}" archived!`);
     };
 
@@ -481,7 +468,8 @@ const Index = () => {
             {activeTimerDetails && (
                  <StudyTimer
                     taskText={activeTimerDetails.taskText}
-                    elapsedSeconds={totalLoggedTimeForActiveTimer + sessionSeconds}
+                    elapsedSeconds={sessionSeconds}
+                    totalLoggedTime={totalLoggedTimeForActiveTimer}
                     isActive={timerIsActive}
                     setIsActive={setTimerIsActive}
                     studyLogs={activeTimerDetails.logs}
