@@ -25,7 +25,6 @@ export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDa
   const handleSubTaskCompletion = (day: number, subTaskIndex: number, completed: boolean) => {
     const updatedTasks = roadmap.dailyTasks.map((task: any) => {
       if (task.day === day) {
-        // Ensure subTasks array exists with all properties
         const subTasks = task.task.split(';').map((s: string, i: number) => ({
             text: s.trim(),
             completed: i === subTaskIndex ? completed : (task.subTasks?.[i]?.completed ?? false),
@@ -39,15 +38,17 @@ export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDa
     onRoadmapUpdate(updatedTasks);
   };
   
-  // FIX: Accurate time formatting
   const formatStudyTime = (logs: StudyLog[] | undefined) => {
     if (!logs || logs.length === 0) return null;
     const totalSeconds = logs.reduce((acc, log) => acc + log.duration, 0);
-    if (totalSeconds < 60) return `${totalSeconds}s logged`;
+    if (totalSeconds === 0) return null;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
     if (hours > 0) return `${hours}h ${minutes}m logged`;
-    return `${minutes}m logged`;
+    if (minutes > 0) return `${minutes}m ${seconds}s logged`;
+    return `${seconds}s logged`;
   };
 
   const selectedDayTask = roadmap.dailyTasks.find((task: any) => task.day === selectedDay);

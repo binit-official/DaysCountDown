@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { MotivationalQuote } from '@/components/MotivationalQuote';
@@ -35,44 +35,63 @@ const Index = () => {
     const [allTasksCompleted, setAllTasksCompleted] = useState(false);
     const [stats, setStats] = useState({ streak: 0, completedMissions: 0, totalStudyTime: 0 });
     const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
-    
-    // FIX: Lifted timer state for persistence
+
+    // Timer state lifted for persistence and focus mode
     const [activeTimerDetails, setActiveTimerDetails] = useState<{ day: number; subTaskIndex: number; taskText: string; logs: StudyLog[] } | null>(null);
     const [timerIsActive, setTimerIsActive] = useState(false);
-    const [timerElapsedSeconds, setTimerElapsedSeconds] = useState(0);
+    const [sessionSeconds, setSessionSeconds] = useState(0);
+    const sessionSecondsRef = useRef(sessionSeconds);
 
-    // FIX: Central timer logic that persists across components
+    useEffect(() => {
+        sessionSecondsRef.current = sessionSeconds;
+    }, [sessionSeconds]);
+
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
         if (timerIsActive) {
             interval = setInterval(() => {
-                setTimerElapsedSeconds(seconds => seconds + 1);
+                setSessionSeconds(seconds => seconds + 1);
             }, 1000);
         }
         return () => {
             if (interval) clearInterval(interval);
         };
     }, [timerIsActive]);
-    
-    // ... (rest of the useEffects and functions)
 
-    const handleOpenTimer = (day: number, subTaskIndex: number, taskText: string, logs: StudyLog[]) => {
-        const totalLoggedTime = logs.reduce((acc, log) => acc + log.duration, 0);
-        setActiveTimerDetails({ day, subTaskIndex, taskText, logs });
-        setTimerElapsedSeconds(totalLoggedTime);
-        setTimerIsActive(false); // Timer starts in a paused state
+    const handleRoadmapUpdate = (newRoadmap: any) => {
+        if (!user) return;
+        setRoadmap(newRoadmap);
+        const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
+        setDoc(roadmapDocRef, newRoadmap, { merge: true });
     };
 
-    const handleCloseTimer = () => {
-        if (timerIsActive) {
-            // If timer is active, pause it but keep details to resume later
-            setTimerIsActive(false);
+    const checkStudyAchievements = async (newTotalStudyTime: number) => {
+        if (!user) return;
+        
+        const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
+        const docSnap = await getDoc(statsDocRef);
+        const currentStats = docSnap.exists() ? docSnap.data() : { unlockedAchievements: [], totalStudyTime: 0 };
+        const newAchievements = [...(currentStats.unlockedAchievements || [])];
+        let achievementUnlocked = false;
+
+        if (newTotalStudyTime >= 3600 && !newAchievements.includes('study_1_hour')) {
+            newAchievements.push('study_1_hour');
+            toast.success("Achievement Unlocked: Focused Mind!");
+            achievementUnlocked = true;
         }
-        setActiveTimerDetails(null);
-    };
+        if (newTotalStudyTime >= 36000 && !newAchievements.includes('study_10_hours')) {
+            newAchievements.push('study_10_hours');
+            toast.success("Achievement Unlocked: Deep Worker!");
+            achievementUnlocked = true;
+        }
 
+        if (achievementUnlocked) {
+            await setDoc(statsDocRef, { unlockedAchievements: [...new Set(newAchievements)] }, { merge: true });
+        }
+    };
+    
     const updateSubTasks = (day: number, subTaskIndex: number, newSubTaskData: object, newTotalStudyTime?: number) => {
-        if (!roadmap) return;
+        if (!roadmap || !user) return;
         const updatedTasks = roadmap.dailyTasks.map((task: any) => {
           if (task.day === day) {
             const subTasks = task.task.split(';').map((s: string, i: number) => ({
@@ -98,19 +117,44 @@ const Index = () => {
         handleRoadmapUpdate(updatedRoadmap);
     };
 
-    const handleSaveStudyLog = (duration: number) => {
-        if (!activeTimerDetails || !user) return;
-        const { day, subTaskIndex } = activeTimerDetails;
+    const handleSaveSession = () => {
+        if (sessionSecondsRef.current > 0 && activeTimerDetails && user) {
+            const { day, subTaskIndex, logs } = activeTimerDetails;
+            const newLog: StudyLog = { id: Date.now().toString(), duration: sessionSecondsRef.current, timestamp: new Date() };
+            const updatedLogs = [...logs, newLog];
 
-        const newLog: StudyLog = { id: Date.now().toString(), duration, timestamp: new Date() };
-        const currentLogs = activeTimerDetails.logs || [];
-        const updatedLogs = [...currentLogs, newLog];
-        
-        const totalTimeForTask = updatedLogs.reduce((acc, log) => acc + log.duration, 0);
-        const newTotalStudyTime = stats.totalStudyTime + duration;
+            const newTotalStudyTime = stats.totalStudyTime + sessionSecondsRef.current;
+            updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
+            
+            setSessionSeconds(0);
+            sessionSecondsRef.current = 0;
+            return true;
+        }
+        return false;
+    };
 
-        updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
-        setTimerElapsedSeconds(totalTimeForTask); // update timer display
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (timerIsActive && sessionSecondsRef.current > 0) {
+                handleSaveSession();
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [timerIsActive, activeTimerDetails, stats.totalStudyTime]);
+
+    const handleOpenTimer = (day: number, subTaskIndex: number, taskText: string, logs: StudyLog[]) => {
+        setActiveTimerDetails({ day, subTaskIndex, taskText, logs });
+    };
+
+    const handleCloseTimer = () => {
+        if (timerIsActive) {
+           setTimerIsActive(false);
+           handleSaveSession();
+        }
+        setActiveTimerDetails(null);
     };
 
     const handleEditStudyLog = (logId: string, newDuration: number) => {
@@ -141,8 +185,7 @@ const Index = () => {
         const newTotalStudyTime = stats.totalStudyTime + durationChange;
         updateSubTasks(day, subTaskIndex, { studyLogs: updatedLogs }, newTotalStudyTime);
     };
-
-
+    
     useEffect(() => {
         const calculateCurrentDay = (startDate: Date | undefined) => {
             if (startDate && !isNaN(startDate.getTime())) {
@@ -249,60 +292,6 @@ const Index = () => {
         await setDoc(docRef, { tasks: updatedTasks }, { merge: true });
     };
 
-    const handleRoadmapUpdate = (newRoadmap: any) => {
-        if (!user) return;
-        setRoadmap(newRoadmap);
-        const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
-        setDoc(roadmapDocRef, newRoadmap, { merge: true });
-    };
-
-    const checkStudyAchievements = async (newTotalStudyTime: number) => {
-        if (!user) return;
-        
-        const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
-        const docSnap = await getDoc(statsDocRef);
-        const currentStats = docSnap.exists() ? docSnap.data() : { unlockedAchievements: [], totalStudyTime: 0 };
-        const newAchievements = [...(currentStats.unlockedAchievements || [])];
-        let achievementUnlocked = false;
-
-        if (newTotalStudyTime >= 3600 && !newAchievements.includes('study_1_hour')) {
-            newAchievements.push('study_1_hour');
-            toast.success("Achievement Unlocked: Focused Mind!");
-            achievementUnlocked = true;
-        }
-        if (newTotalStudyTime >= 36000 && !newAchievements.includes('study_10_hours')) {
-            newAchievements.push('study_10_hours');
-            toast.success("Achievement Unlocked: Deep Worker!");
-            achievementUnlocked = true;
-        }
-
-        if (achievementUnlocked) {
-            await setDoc(statsDocRef, { unlockedAchievements: [...new Set(newAchievements)] }, { merge: true });
-        }
-    };
-
-    const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
-        if (!user || !roadmap) return;
-    
-        const wasAllTodayComplete = roadmap.dailyTasks
-            .filter((t: any) => t.day === currentDay)
-            .every((t: any) => t.completed);
-    
-        const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
-    
-        const isAllTodayComplete = updatedDailyTasks
-            .filter(t => t.day === currentDay)
-            .every(t => t.completed);
-    
-        if (isAllTodayComplete && !wasAllTodayComplete) {
-            await checkStreaksAndAchievements();
-        } else if (!isAllTodayComplete && wasAllTodayComplete) {
-            await revertStreakForToday();
-        }
-        
-        handleRoadmapUpdate(updatedRoadmap); 
-    };
-
     const checkStreaksAndAchievements = async () => {
         if (!user) return;
         const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
@@ -356,6 +345,28 @@ const Index = () => {
             toast.info("Streak reverted for today.");
         }
     };
+    
+    const handleDailyTaskUpdate = async (updatedDailyTasks: any[]) => {
+        if (!user || !roadmap) return;
+    
+        const wasAllTodayComplete = roadmap.dailyTasks
+            .filter((t: any) => t.day === currentDay)
+            .every((t: any) => t.completed);
+    
+        const updatedRoadmap = { ...roadmap, dailyTasks: updatedDailyTasks };
+    
+        const isAllTodayComplete = updatedDailyTasks
+            .filter(t => t.day === currentDay)
+            .every(t => t.completed);
+    
+        if (isAllTodayComplete && !wasAllTodayComplete) {
+            await checkStreaksAndAchievements();
+        } else if (!isAllTodayComplete && wasAllTodayComplete) {
+            await revertStreakForToday();
+        }
+        
+        handleRoadmapUpdate(updatedRoadmap); 
+    };
 
     const handleArchiveMission = async (taskToArchive: Task) => {
         if (!user) return;
@@ -388,8 +399,14 @@ const Index = () => {
         );
     }
 
+    const totalLoggedTimeForActiveTimer = activeTimerDetails?.logs.reduce((acc, log) => acc + log.duration, 0) || 0;
+
     return (
         <div className="min-h-screen bg-background flex flex-col">
+             {timerIsActive && (
+                <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm" />
+             )}
+            
             <header className="relative z-10 border-b border-primary/20 bg-background/50 backdrop-blur-sm">
                 <div className="absolute inset-0 -z-10 h-full w-full bg-[radial-gradient(hsl(var(--primary)/0.1)_1px,transparent_1px)] [background-size:16px_16px]"></div>
                 <div className="relative container mx-auto px-4 py-4">
@@ -443,7 +460,6 @@ const Index = () => {
                         <Guiding />
                     </div>
                 </div>
-
                 <div className="mt-8">
                     <FeelingTracker />
                 </div>
@@ -459,16 +475,17 @@ const Index = () => {
                     isNewUser={isNewUser}
                 />
             </main>
+
             <Footer />
 
             {activeTimerDetails && (
                  <StudyTimer
                     taskText={activeTimerDetails.taskText}
-                    elapsedSeconds={timerElapsedSeconds}
+                    elapsedSeconds={totalLoggedTimeForActiveTimer + sessionSeconds}
                     isActive={timerIsActive}
                     setIsActive={setTimerIsActive}
                     studyLogs={activeTimerDetails.logs}
-                    onAddLog={handleSaveStudyLog}
+                    onSaveSession={handleSaveSession}
                     onEditLog={handleEditStudyLog}
                     onDeleteLog={handleDeleteStudyLog}
                     onClose={handleCloseTimer}
