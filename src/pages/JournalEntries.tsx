@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc, documentId, deleteField } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, deleteField, documentId } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -48,11 +48,17 @@ const JournalEntries = () => {
   useEffect(() => {
     if (!user) return;
     const journalCollectionRef = collection(db, 'users', user.uid, 'journal');
+    // FIX: Use the official documentId() function for robust sorting of all documents.
     const q = query(journalCollectionRef, orderBy(documentId(), 'desc'));
+    
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const journalEntries = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry));
+      const journalEntries = querySnapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() 
+      } as JournalEntry));
       setEntries(journalEntries);
     });
+
     return () => unsubscribe();
   }, [user]);
 
@@ -144,23 +150,25 @@ const JournalEntries = () => {
                           <Button size="sm" onClick={() => handleEdit(entry)}>
                             {entry.entry ? 'Edit Journal' : 'Add Journal Entry'}
                           </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="destructive" disabled={!entry.entry}>Delete Journal</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete your journal text for this day. Your mood and state of mind entries will be preserved.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteJournalText(entry.id)}>Delete Journal Text</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {entry.entry && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive">Delete Journal</Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete your journal text for this day. Your mood and state of mind entries will be preserved.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteJournalText(entry.id)}>Delete Journal Text</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </>
                     )}
