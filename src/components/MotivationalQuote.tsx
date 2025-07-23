@@ -2,11 +2,123 @@ import { useState, useEffect } from 'react';
 import { Zap, Target, Clock, Flame } from 'lucide-react';
 
 const mockingQuotes = [
+  "In this game, friendship is your greatest weakness. – Yuuichi Katagiri",
+  "People will abandon their morals if you dangle enough money. – Tenji Mikasa",
+  "You think you're a good person? Wait until you're desperate. – Yuuichi Katagiri",
+  "Trust is a luxury the desperate can't afford. – Manabu-kun",
+  "You can't save everyone. – Tenji Mikasa",
+  "The truth is a weapon. Use it wisely. – Yuuichi Katagiri",
+  "In the end, it's everyone for themselves. – Manabu-kun",
+  "Your friends will betray you when it matters most. – Tenji Mikasa",
+  "It's not about truth. It's about survival. – Yuuichi Katagiri",
+
+  // ⏳ Link Click (Shiguang Dailiren)
+  "Knowing the past doesn’t mean you can fix the future. – Cheng Xiaoshi",
+  "Every second counts. Regret wastes them all. – Lu Guang",
+  "You carry the pain of others, you forget your own. – Cheng Xiaoshi",
+  "The past is a burden. The future is a risk. – Lu Guang",
+  "Don't just watch the moment. Understand it. – Lu Guang",
+  "We don’t save people. We witness their truth. – Cheng Xiaoshi",
+
+  // 🔥 Bonus from Black Clover (More Unique)
+  "Even if you were born without magic, you can still swing a sword. – Nacht Faust",
+  "You’ll never be chosen if you never stand up. – Yuno",
+  "Being underestimated is your greatest weapon. – Asta",
+  "Curses are broken by willpower, not by luck. – Secre Swallowtail",
+  "You’re not weak. You’re just not angry enough yet. – Yami Sukehiro",
+
+  // 🎯 Bonus from Hunter x Hunter (More Unique)
+  "Strength is not just physical. It’s mental. It’s emotional. – Kurapika",
+  "The world is cruel, but it’s also beautiful. – Killua Zoldyck",
+  "You can’t change the world without getting your hands dirty. – Hisoka Morow",
+  "The strongest weapon is the one you wield with conviction. – Gon Freecss",
+  "You can’t save everyone, but you can try. – Leorio Paradinight",
+  "Pain is a reminder that you’re alive. Use it. – Killua Zoldyck",
+  "The world’s not fair. That’s why you need to be stronger than it. – Hisoka Morow",
+  "Kill or be killed isn’t just a rule. It’s the default. – Illumi Zoldyck",
+  "If you pity your enemy, you give them power. – Chrollo Lucilfer",
+  "Your emotions are tools. Learn to use them, or be used by them. – Kurapika",
+  "You don’t win by being kind. You win by being smarter. – Ging Freecss",
+
+  // 🏐 Bonus from Haikyuu!! (More Unique)
+  "It’s not talent. It’s obsession. – Kageyama Tobio",
+  "Height doesn't matter if you have the guts to jump. – Hinata Shoyo",
+  "The only thing that matters on court is the score. Everything else is noise. – Ushijima Wakatoshi",
+  "We train because losing hurts more than pain. – Nishinoya Yuu",
+  "Hard work doesn’t guarantee success, but not working guarantees failure. – Daichi Sawamura",
+  "The moment you think of giving up, think of the reason why you held on so long. – Natsu Dragneel",
+
+
+  // ⚔️ Bonus from Demon Slayer (More Unique)
+  "There’s no such thing as a painless victory. – Inosuke Hashibira",
+  "The weak die. The strong survive. And the good suffer. – Muzan Kibutsuji",
+  "You can't save everyone. But you can choose who you'll never give up on. – Tanjiro Kamado",
+  "Strength born of pain is strength that never breaks. – Sanemi Shinazugawa",
+  "The more scars you have, the harder it is to fall again. – Giyu Tomioka",
+
+
+  // 💪 Bonus from Baki (More Unique)
+  "You're not training to fight. You're training to bleed. – Baki Hanma",
+  "Pain is your instructor. And it's never wrong. – Doppo Orochi",
+  "If you're scared of dying, you’re not alive. – Yujiro Hanma",
+  "Every bone broken is a badge of purpose. – Kaoru Hanayama",
+  "There are no rules. There’s only dominance. – Jack Hanma" ,
+  "The strongest will survive. The rest will be crushed. – Baki Hanma",
+  "Pain is a reminder that you’re still alive. – Retsu Kaioh",
+
+  "I'm going to be the Wizard King. No matter what anyone says. – Asta",
+  "Surpass your limits. Right here. Right now! – Yami Sukehiro",
+  "Being weak is nothing to be ashamed of... staying weak is. – Fuegoleon Vermillion",
+  "I don’t care what I have to do. I’ll never give up. – Asta",
+  "The path to achieving your dreams is never easy. – Nozel Silva",
+
+  // 🎯 Hunter x Hunter
+  "An apology is a promise to do things differently next time. And to keep that promise. – Killua Zoldyck",
+  "You should enjoy the little detours. Because that's where you'll find the things more important than what you want. – Ging Freecss",
+  "I’ll survive… and I’ll get stronger. – Gon Freecss",
+  "A beast in human's clothing understands better than anyone how people want to be treated. – Hisoka Morow",
+  "When I say it doesn’t hurt me, that means I can bear it. – Killua Zoldyck",
+
+  // 🏐 Haikyuu!!
+  "The future belongs to those who believe in themselves and keep going. – Shoyo Hinata",
+  "There’s no such thing as a painless comeback. – Tobio Kageyama",
+  "Being weak means there's room to grow. – Kenma Kozume",
+  "We’re not the tallest. We’re not the strongest. But we never give up! – Karasuno Team",
+  "A challenge is a wall waiting to be broken. – Daichi Sawamura",
+
+  // ⚔️ Demon Slayer
+  "No matter how many people you may lose, you have no choice but to go on living. – Tanjiro Kamado",
+  "Feel the rage. The powerful, pure rage of not being able to forgive will become your unswerving drive to take action! – Giyu Tomioka",
+  "The strongest will survive. The rest will be crushed. – Muzan Kibutsuji",
+
+  "The bond between humans is stronger than any curse. – Nezuko Kamado",
+  "Go ahead and live with your head held high. No matter how devastated you may be by your own weakness. – Kyojuro Rengoku",
+  "Don’t stop. Run. You’ve got legs, don’t you? – Zenitsu Agatsuma",
+
+  "Those who get back up are strong. Those who rise after defeat… become legends. – Kyojuro Rengoku",
+
+
+  // 💪 Baki
+  "The moment you think you're strong is the moment you're weak. – Yujiro Hanma",
+  "Fear is a tool. Use it to sharpen your focus, not break your will. – Baki Hanma",
+  "Strength isn’t given. It’s earned. Through pain. Through blood. – Doppo Orochi",
+  "You’ll never reach your peak without crawling through hell. – Kaioh Retsu",
+  "In this world, the strongest survive. Crying doesn’t change that. – Yujiro Hanma",
+
+  // 🧠 Parasyte: The Maxim
+  "Humans aren't the strongest species. They're just the most adaptable. – Migi",
+  "To live means constantly evolving. If you stop, you're already dead. – Shinichi Izumi",
+  "I am me. No more, no less. – Migi",
+  "Sympathy is born from understanding, not blood. – Shinichi Izumi",
+  "What does it mean to be human? It's not the body. It's the choices. – Migi",
+
   "Still scrolling? That's why you're still here.",
   "Your goals called. They went to voicemail. Again.",
   "Dreams don't have deadlines? Yours should. NOW.",
   "Comfort zone population: Just you. Forever.",
   "Tomorrow's excuse is already loading...",
+  "Your future self is tired of your procrastination.",
+  
   "Procrastination level: LEGENDARY. Congratulations.",
   "Your future self is writing your resignation letter.",
   "Success knocked. You were too busy 'planning' to answer.",
