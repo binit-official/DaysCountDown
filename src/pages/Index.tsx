@@ -23,6 +23,10 @@ import { Guiding } from '@/components/Guiding';
 import { FeelingTracker } from '@/components/FeelingTracker';
 import { StudyTimer, StudyLog } from '@/components/StudyTimer';
 import { ALL_ACHIEVEMENTS } from '@/components/Achievements';
+import { fetchWithRetry } from '@/lib/utils';
+import { RoadmapPreview } from '@/components/RoadmapPreview';
+
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const Index = () => {
     const { user } = useAuth();
@@ -42,6 +46,7 @@ const Index = () => {
     const [sessionSeconds, setSessionSeconds] = useState(0);
     const sessionSecondsRef = useRef(sessionSeconds);
     const initialCheckDone = useRef(false);
+    const [proposedRoadmap, setProposedRoadmap] = useState<any | null>(null);
 
     useEffect(() => {
         sessionSecondsRef.current = sessionSeconds;
@@ -292,10 +297,9 @@ const Index = () => {
         updateTasksAndStatsAtomically(day, subTaskIndex, undefined, logId);
     };
     
-    // FIX: This useEffect now correctly calculates and sets the current and selected day
     useEffect(() => {
         const calculateCurrentDay = (startDate: Date | undefined) => {
-            if (startDate && !isNaN(startDate.getTime())) {
+            if (startDate && typeof startDate.getTime === 'function') {
                 const now = new Date();
                 const start = new Date(startDate);
                 start.setHours(0, 0, 0, 0);
@@ -309,7 +313,7 @@ const Index = () => {
         if (roadmap?.dailyTasks && roadmap.startDate) {
             const day = calculateCurrentDay(roadmap.startDate);
             setCurrentDay(day);
-            setSelectedDay(day); // This ensures the view defaults to the current day
+            setSelectedDay(day); 
             const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
             setHasIncompleteTasks(incomplete);
             const allComplete = roadmap.dailyTasks.every((task: any) => task.completed);
@@ -338,8 +342,8 @@ const Index = () => {
             if (docSnap.exists() && docSnap.data().tasks) {
                 const loadedTasks = docSnap.data().tasks.map((task: any) => ({
                     ...task,
-                    targetDate: task.targetDate.toDate(),
-                    startDate: task.startDate.toDate(),
+                    targetDate: task.targetDate?.toDate(),
+                    startDate: task.startDate?.toDate(),
                 }));
                 setTasks(loadedTasks);
                 if (!selectedTaskId && loadedTasks.length > 0) {
@@ -356,17 +360,30 @@ const Index = () => {
             if (docSnap.metadata.hasPendingWrites) return;
             if (docSnap.exists()) {
                 const data = docSnap.data();
+                
+                const toValidDate = (d: any) => {
+                    if (!d) return null;
+                    if (d.toDate) return d.toDate();
+                    if (d instanceof Date) return d;
+                    const parsed = new Date(d);
+                    return isNaN(parsed.getTime()) ? null : parsed;
+                };
+
                 const convertedDailyTasks = data.dailyTasks?.map((task: any) => ({
                     ...task,
                     subTasks: task.subTasks?.map((sub: any) => ({
                         ...sub,
                         studyLogs: sub.studyLogs?.map((log: any) => ({
                             ...log,
-                            timestamp: log.timestamp.toDate(),
+                            timestamp: toValidDate(log.timestamp),
                         })) || [],
                     })) || [],
                 }));
-                const newRoadmap = { ...data, startDate: data.startDate.toDate(), dailyTasks: convertedDailyTasks };
+                const newRoadmap = { 
+                    ...data, 
+                    startDate: toValidDate(data.startDate),
+                    dailyTasks: convertedDailyTasks 
+                };
                 setRoadmap(newRoadmap);
             } else {
                 setRoadmap(null);
@@ -512,7 +529,127 @@ const Index = () => {
 
         toast.success(`Mission "${taskToArchive.title}" archived!`);
     };
+    
+    const handleInfuseTasks = () => {
+        if (!roadmap) return;
+        
+        const updatedDailyTasks = JSON.parse(JSON.stringify(roadmap.dailyTasks));
+    
+        const incompleteSubTasks: any[] = [];
+        updatedDailyTasks.forEach((task: any) => {
+            if (task.day < currentDay && !task.completed) {
+                const subTasks = (task.subTasks && task.subTasks.length > 0)
+                    ? task.subTasks
+                    : task.task.split(';').map((t: string) => ({ text: t.trim(), completed: false }));
+    
+                const missed = subTasks.filter((sub: any) => !sub.completed);
+                incompleteSubTasks.push(...missed.map((sub: any) => ({ ...sub, text: `[Recovery] ${sub.text}` })));
+            }
+        });
+    
+        if (incompleteSubTasks.length === 0) {
+            toast.info("No incomplete tasks to infuse!");
+            return;
+        }
+    
+        const futureDays = updatedDailyTasks.filter((task: any) => task.day >= currentDay);
+        const easyAndMediumDays = futureDays.filter((d: any) => d.difficulty === 'Easy' || d.difficulty === 'Medium');
+    
+        if (easyAndMediumDays.length === 0) {
+            toast.error("No 'Easy' or 'Medium' future days available to add tasks.");
+            return;
+        }
+    
+        incompleteSubTasks.forEach((missedTask: any, index: number) => {
+            const targetDay = easyAndMediumDays[index % easyAndMediumDays.length];
+            targetDay.task = `${targetDay.task}; ${missedTask.text}`;
+        });
+    
+        setProposedRoadmap({ ...roadmap, dailyTasks: updatedDailyTasks });
+    };
 
+    const handleReplanWithAI = async () => {
+        if (!roadmap || !user) return;
+        setLoading(true);
+        toast.info("Asking Nyx to generate a new plan...");
+
+        const incompleteTasks = roadmap.dailyTasks
+            .filter((task: any) => task.day < currentDay && !task.completed)
+            .map((task: any) => `Day ${task.day} (Incomplete): ${task.task}`);
+
+        const futureTasks = roadmap.dailyTasks
+            .filter((task: any) => task.day >= currentDay)
+            .map((task: any) => `Day ${task.day} (Planned): ${task.task}`);
+
+        const remainingDays = roadmap.days - currentDay + 1;
+        if (remainingDays <= 0) {
+            toast.error("No remaining days to re-plan.");
+            setLoading(false);
+            return;
+        }
+
+        const prompt = `
+            You are an expert project manager. A user is working towards the goal: "${roadmap.goal}".
+            They have fallen behind. Here is a list of their incomplete tasks from past days:
+            ${incompleteTasks.join('\n')}
+
+            Here is a list of their future planned tasks:
+            ${futureTasks.join('\n')}
+
+            Your task is to create a new, realistic, and optimized roadmap for the remaining ${remainingDays} days.
+            This new plan should intelligently combine and reschedule ALL of the incomplete and future tasks.
+            The new plan must start from Day ${currentDay}.
+
+            For each day, provide a detailed, multi-part task using semicolons as a delimiter.
+            Also, provide a difficulty rating: 'Easy', 'Medium', 'Hard', or 'Challenge'.
+
+            Respond ONLY with a valid JSON array of objects. The array must contain exactly ${remainingDays} objects. Each object must have three fields: "day", "task", and "difficulty".
+            The "day" field must be a number, starting from ${currentDay}.
+        `;
+
+        try {
+            const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            });
+
+            const data = await response.json();
+            const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!content) throw new Error("AI failed to generate a new plan.");
+
+            const cleanedContent = content.replace(/```json\n?|```/g, '').trim();
+            const newDailyTasks = JSON.parse(cleanedContent);
+
+            const newRoadmap = {
+                ...roadmap,
+                dailyTasks: [
+                    ...roadmap.dailyTasks.filter((t: any) => t.day < currentDay),
+                    ...newDailyTasks.map((item: any) => ({ ...item, completed: false }))
+                ]
+            };
+            setProposedRoadmap(newRoadmap);
+        } catch (e: any) {
+            toast.error(`Failed to re-plan: ${e.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleApproveChanges = () => {
+        if(proposedRoadmap){
+            const updatedRoadmap = JSON.parse(JSON.stringify(proposedRoadmap));
+            updatedRoadmap.dailyTasks.forEach((task: any) => {
+                if (task.day < currentDay && !task.completed) {
+                    task.completed = true;
+                }
+            });
+            handleRoadmapUpdate(updatedRoadmap);
+            toast.success("Your roadmap has been updated!");
+            setProposedRoadmap(null);
+        }
+    };
+    
     if (loading || !stats) {
         return (
             <div className="min-h-screen flex items-center justify-center text-2xl font-bold text-primary">
@@ -596,6 +733,8 @@ const Index = () => {
                     allTasksCompleted={allTasksCompleted}
                     currentDay={currentDay}
                     isNewUser={isNewUser}
+                    onInfuseTasks={handleInfuseTasks}
+                    onReplan={handleReplanWithAI}
                 />
             </main>
 
@@ -614,6 +753,15 @@ const Index = () => {
                     onDeleteLog={handleDeleteStudyLog}
                     onClose={handleCloseTimer}
                  />
+            )}
+
+            {proposedRoadmap && (
+                <RoadmapPreview
+                    proposedRoadmap={proposedRoadmap}
+                    onCancel={() => setProposedRoadmap(null)}
+                    onApprove={handleApproveChanges}
+                    currentDay={currentDay}
+                />
             )}
         </div>
     );
