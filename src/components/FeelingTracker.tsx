@@ -1,91 +1,137 @@
-import React, { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, setDoc, arrayUnion } from 'firebase/firestore';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { HeartPulse } from 'lucide-react';
-import { toast } from 'sonner';
-import { fetchWithRetry } from '@/lib/utils';
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
+import { db } from "@/lib/firebase";
+import { doc, setDoc, arrayUnion } from "firebase/firestore";
+import { toast } from "sonner";
+import { fetchWithFallback } from "@/lib/utils";
+import { Bot, Wand2 } from "lucide-react";
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_API_KEY_2 = import.meta.env.VITE_GEMINI_API_KEY_2;
+const API_BASE_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
-export const FeelingTracker = () => {
+const getLocalDateString = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export const FeelingTracker: React.FC = () => {
   const { user } = useAuth();
-  const [feeling, setFeeling] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [feeling, setFeeling] = useState("");
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
-  const analyzeAndLogMood = async (feelingText: string) => {
-    if (!user) return;
-    const today = new Date().toISOString().split('T')[0];
-    const journalDocRef = doc(db, 'users', user.uid, 'journal', today);
+  const handleLogAndAnalyze = async () => {
+    if (!user || !feeling.trim()) return;
 
-    // 1. Send to Gemini for classification
-    const prompt = `Analyze the sentiment of the following text and classify it into one of these categories: Productive, Focused, Exhausted, Confused, Angry, Happy, Sad, Anxious, Calm, Motivated, Stressed. Respond with ONLY the single category name. Text: "${feelingText}"`;
+    setLoadingAnalysis(true);
+    setAnalysis(null);
+
+    const feelingToLog = feeling.trim();
+    const newFeelingEntry = { text: feelingToLog, timestamp: new Date() };
+    const todayDateString = getLocalDateString();
 
     try {
-        const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        });
-        const data = await response.json();
-        const mood = data.candidates?.[0]?.content?.parts?.[0]?.text.trim() || 'Neutral';
+      // Step 1: Save the feeling to the CORRECT 'journal' document.
+      const docRef = doc(db, "users", user.uid, "journal", todayDateString);
+      await setDoc(
+        docRef,
+        {
+          feelings: arrayUnion(newFeelingEntry),
+          date: todayDateString, // Also set the date for querying
+        },
+        { merge: true }
+      );
 
-        // 2. Save the classified mood to the daily journal document's moods array
-        await setDoc(journalDocRef, { 
-            moods: arrayUnion({ mood: mood, timestamp: new Date() })
-        }, { merge: true });
+      toast.success("Quick note logged.");
+      const feelingToAnalyze = feeling;
+      setFeeling("");
 
-        toast.success(`Emotional Stat Updated: ${mood}`);
+      // Step 2: Attempt the AI analysis.
+      const prompt = `
+                You are an empathetic wellness analyst named Sally.
+                A user just logged a new feeling: "${feelingToAnalyze}".
+                Analyze this feeling. Provide a short, gentle, and insightful summary (1-2 sentences).
+                Do not give advice, just a compassionate observation.
+                Respond ONLY with the summary text.
+            `;
 
-    } catch (error) {
-        console.error("Failed to analyze mood:", error);
-        toast.error("Could not analyze mood, but your entry was saved.");
+      const response = await fetchWithFallback(
+        API_BASE_URL,
+        GEMINI_API_KEY,
+        GEMINI_API_KEY_2,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        },
+        (message) => toast.info(message)
+      );
+
+      if (!response.ok) throw new Error("AI server responded with an error.");
+
+      const data = await response.json();
+      const modelResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (modelResponse) {
+        setAnalysis(modelResponse);
+      } else {
+        throw new Error("Analysis failed to generate a response.");
+      }
+    } catch (error: any) {
+      toast.error(`Analysis failed: ${error.message}`, {
+        description: "Your note was still saved successfully.",
+      });
+    } finally {
+      setLoadingAnalysis(false);
     }
   };
 
-  const handleSaveFeeling = async () => {
-    if (!user || !feeling.trim()) return;
-    setLoading(true);
-    
-    // Save the raw text feeling to the 'feelings' array in the daily journal document
-    const today = new Date().toISOString().split('T')[0];
-    const journalDocRef = doc(db, 'users', user.uid, 'journal', today);
-    await setDoc(journalDocRef, { 
-        feelings: arrayUnion({ text: feeling, timestamp: new Date() })
-    }, { merge: true });
-    
-    toast.success('Your state of mind has been recorded.');
-    
-    // Also analyze and save a categorized mood for stats
-    await analyzeAndLogMood(feeling);
-
-    setFeeling('');
-    setLoading(false);
-  };
-
   return (
-    <Card className="neon-border bg-card/90">
+    <Card className="neon-border-secondary">
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <HeartPulse className="w-5 h-5 mr-2 text-accent" />
-          State of Mind
-        </CardTitle>
+        <CardTitle style={{ textAlign: "center" }}>
+          🧠 State of Mind 🧠
+        </CardTitle>{" "}
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground mb-2">How are you feeling right now?</p>
-        <Textarea
-          value={feeling}
-          onChange={(e) => setFeeling(e.target.value)}
-          placeholder="e.g., 'Feeling a bit stressed about the deadline, but motivated to push through.'"
-          className="mb-4"
-          disabled={loading}
-        />
-        <Button onClick={handleSaveFeeling} className="w-full cyberpunk-button" disabled={loading}>
-          {loading ? 'Analyzing...' : 'Save Feeling'}
-        </Button>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Log a quick feeling or thought..."
+            value={feeling}
+            onChange={(e) => setFeeling(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleLogAndAnalyze()}
+            disabled={loadingAnalysis}
+          />
+          <Button
+            onClick={handleLogAndAnalyze}
+            disabled={loadingAnalysis || !feeling.trim()}
+          >
+            {loadingAnalysis ? (
+              "Saving..."
+            ) : (
+              <>
+                <Wand2 className="mr-2 h-4 w-4" /> Log & Analyze
+              </>
+            )}
+          </Button>
+        </div>
+
+        {analysis && !loadingAnalysis && (
+          <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
+            <p className="flex items-start gap-2">
+              <Bot className="h-5 w-5 text-secondary flex-shrink-0 mt-1" />
+              <span>{analysis}</span>
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

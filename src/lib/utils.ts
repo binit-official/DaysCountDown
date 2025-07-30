@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// This function remains the same, it's used by our new fallback function.
+// The 'export' keyword is correctly present here now.
 export const fetchWithRetry = async (url: string, options: RequestInit, retries = 3, delay = 1000) => {
   for (let i = 0; i < retries; i++) {
     try {
@@ -26,31 +26,37 @@ export const fetchWithRetry = async (url: string, options: RequestInit, retries 
   throw new Error('Failed after multiple retries');
 };
 
-
-// This is the new, more efficient fallback function that replaces the race logic.
+// This is the smarter fallback function.
 export const fetchWithFallback = async (
     baseUrl: string,
     key1: string,
     key2: string,
-    options: RequestInit
+    options: RequestInit,
+    onStatusUpdate?: (message: string) => void
 ) => {
     const url1 = `${baseUrl}?key=${key1}`;
     
+    const tryFetch = async (url: string) => {
+        const response = await fetch(url, options);
+        if (response.status === 429) {
+            throw new Error(`Rate limit exceeded for this API key.`);
+        }
+        if (!response.ok) {
+            throw new Error(`Server responded with status: ${response.status}`);
+        }
+        return response;
+    };
+
     try {
-        // First, try the primary key
-        console.log("Attempting API call with primary key...");
-        return await fetchWithRetry(url1, options);
+        onStatusUpdate?.("Attempting API Key 1...");
+        return await tryFetch(url1);
     } catch (error) {
-        console.warn(`Primary API key failed: ${error}. Attempting fallback...`);
-        
-        // If the first key fails and a second key exists, try the fallback key
+        onStatusUpdate?.(`API Key 1 failed. Attempting fallback...`);
         if (key2) {
             const url2 = `${baseUrl}?key=${key2}`;
-            console.log("Attempting API call with fallback key...");
-            return await fetchWithRetry(url2, options);
+            onStatusUpdate?.("Attempting API Key 2...");
+            return await tryFetch(url2);
         }
-        
-        // If there's no second key or the second one also fails, throw the error
         throw error;
     }
 };

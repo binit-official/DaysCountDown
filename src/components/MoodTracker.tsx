@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,49 +21,60 @@ interface MoodTrackerProps {
     onMoodLog: () => void;
 }
 
+const getLocalDateString = () => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 export const MoodTracker = ({ onMoodLog }: MoodTrackerProps) => {
   const { user } = useAuth();
   const [showPrompt, setShowPrompt] = useState(false);
-  const [initialCheckComplete, setInitialCheckComplete] = useState(false);
 
   useEffect(() => {
     if (!user) return;
 
-    const today = new Date().toISOString().split('T')[0];
-    const journalDocRef = doc(db, 'users', user.uid, 'journal', today);
+    const todayDateString = getLocalDateString();
+    const docRef = doc(db, 'users', user.uid, 'journal', todayDateString);
 
-    const checkMood = (lastLogTime: Date | null) => {
-      if (lastLogTime) {
-        const hoursSinceLastLog = (new Date().getTime() - lastLogTime.getTime()) / (1000 * 60 * 60);
-        if (hoursSinceLastLog > 5) {
-          setShowPrompt(true);
-        }
-      } else {
-        setShowPrompt(true);
-      }
-    };
-
-    const unsubscribe = onSnapshot(journalDocRef, (docSnap) => {
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
         let lastLogTime: Date | null = null;
         if (docSnap.exists() && docSnap.data().moods?.length > 0) {
-            const lastMood = docSnap.data().moods.slice(-1)[0];
+            // Find the most recent mood entry
+            const lastMood = docSnap.data().moods.reduce((latest: any, current: any) => {
+                return latest.timestamp.toDate() > current.timestamp.toDate() ? latest : current;
+            });
             lastLogTime = lastMood.timestamp.toDate();
         }
-        checkMood(lastLogTime);
-        if (!initialCheckComplete) setInitialCheckComplete(true);
+        
+        if (lastLogTime) {
+            const hoursSinceLastLog = (new Date().getTime() - lastLogTime.getTime()) / (1000 * 60 * 60);
+            if (hoursSinceLastLog > 5) {
+                setShowPrompt(true);
+            }
+        } else {
+            // If no moods logged today, show the prompt
+            setShowPrompt(true);
+        }
     });
 
     return () => unsubscribe();
-  }, [user, initialCheckComplete]);
+  }, [user]);
 
 
   const handleMoodLog = async (mood: string) => {
     if (!user) return;
-    const today = new Date().toISOString().split('T')[0];
-    const journalDocRef = doc(db, 'users', user.uid, 'journal', today);
-    await setDoc(journalDocRef, { 
-      moods: arrayUnion({ mood: mood, timestamp: new Date() })
+    const todayDateString = getLocalDateString();
+    // This is the critical fix: we point to the correct 'journal' collection
+    const docRef = doc(db, 'users', user.uid, 'journal', todayDateString);
+
+    await setDoc(docRef, { 
+      moods: arrayUnion({ mood: mood, timestamp: new Date() }),
+      date: todayDateString // Also set the date for querying
     }, { merge: true });
+
     toast.success(`Mood logged: ${mood}`);
     setShowPrompt(false);
     onMoodLog();
@@ -98,7 +109,6 @@ export const MoodTracker = ({ onMoodLog }: MoodTrackerProps) => {
 
   return (
     <Dialog open={showPrompt} onOpenChange={setShowPrompt}>
-      {/* FIX: Increased the max-width of the dialog for better spacing */}
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl">How are you feeling right now?</DialogTitle>

@@ -19,9 +19,11 @@ interface SallyProps {
     journal: any[];
     moods: any;
     stats: any;
+    missions: any[];
+    roadmap: any;
 }
 
-export const Guiding: React.FC<SallyProps> = ({ isOpen, onOpenChange, isOtherAssistantOpen, journal, moods, stats }) => {
+export const Guiding: React.FC<SallyProps> = ({ isOpen, onOpenChange, isOtherAssistantOpen, journal, moods, stats, missions, roadmap }) => {
     const [messages, setMessages] = useState<{ role: 'user' | 'model', text: string }[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -34,21 +36,25 @@ export const Guiding: React.FC<SallyProps> = ({ isOpen, onOpenChange, isOtherAss
         setInput('');
         setLoading(true);
 
+        // This is the new, highly-detailed context prompt for Sally
         const contextPrompt = `
-            You are Sally, a supportive and empathetic AI wellness coach. Your goal is to help the user understand their feelings and maintain mental well-being. You are kind, insightful, and encouraging.
+            You are Sally, a supportive and empathetic AI wellness coach. Your goal is to help the user understand their feelings and maintain mental well-being in the context of their goals. You are kind, insightful, and encouraging.
 
-            Here is the user's current data:
-            - Recent Journal Entries (last 5): ${journal.slice(-5).map(j => `On ${j.date}: "${j.entry}"`).join('\n') || 'None'}
-            - Recent Moods: ${moods?.moods?.slice(-5).map((m: any) => `${m.mood} (at ${new Date(m.timestamp?.toDate()).toLocaleString()})`).join(', ') || 'None'}
-            - Recent Feelings: ${moods?.feelings?.slice(-5).map((f: any) => `${f.feeling} (at ${new Date(f.timestamp?.toDate()).toLocaleString()})`).join(', ') || 'None'}
+            HERE IS ALL OF THE USER'S CURRENT DATA:
+            - Active Missions: ${missions?.map(m => `"${m.title}" (Priority: ${m.priority})`).join(', ') || 'None'}
+            - Current Roadmap Goal: "${roadmap?.goal || 'None defined'}"
+            - Progress: ${roadmap ? `Day ${roadmap.day || 1} of ${roadmap.days}` : 'No roadmap active'}
             - Current Streak: ${stats?.streak || 0} days.
+            - Recent Journal Entries (last 3): ${journal.slice(-3).map(j => `On ${j.date}: "${j.entry}"`).join('\n') || 'None logged.'}
+            - Recent Moods Logged (last 5): ${moods?.moods?.slice(-5).map((m: any) => m.mood).join(', ') || 'None logged.'}
+            - Recent Feelings Logged (last 5): ${moods?.feelings?.slice(-5).map((f: any) => f.feeling).join(', ') || 'None logged.'}
 
-            Previous conversation with you (Sally):
+            PREVIOUS CONVERSATION HISTORY WITH YOU (SALLY):
             ${messages.map(m => `${m.role}: ${m.text}`).join('\n')}
             
-            User's new message: "${input}"
+            USER'S NEW MESSAGE: "${input}"
 
-            Based on all this context, provide a thoughtful, supportive, and helpful response.
+            Based on ALL of this context, provide a thoughtful, supportive, and helpful response. If the user asks about their mood, use the "Recent Moods" and "Recent Feelings" data to give a specific and insightful answer. Connect their feelings to their goals and progress.
         `;
 
         try {
@@ -60,8 +66,14 @@ export const Guiding: React.FC<SallyProps> = ({ isOpen, onOpenChange, isOtherAss
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: contextPrompt }] }] }),
-                }
+                },
+                (message) => toast.info(message)
             );
+            
+            if (!response.ok) {
+                if (response.status === 429) throw new Error("API quota exceeded. Please try again later.");
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
             const data = await response.json();
             const modelResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -69,7 +81,7 @@ export const Guiding: React.FC<SallyProps> = ({ isOpen, onOpenChange, isOtherAss
             if (modelResponse) {
                 setMessages(prev => [...prev, { role: 'model', text: modelResponse }]);
             } else {
-                throw new Error("Model response was empty.");
+                throw new Error("Model response was empty or invalid.");
             }
 
         } catch (error: any) {

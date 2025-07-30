@@ -20,6 +20,7 @@ interface AIAssistantProps {
     hasIncompleteTasks: boolean;
     allTasksCompleted: boolean;
     currentDay: number;
+    stats: any;
     onInfuseTasks: () => void;
     onReplan: () => void;
 }
@@ -33,6 +34,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
     hasIncompleteTasks,
     allTasksCompleted,
     currentDay,
+    stats,
     onInfuseTasks,
     onReplan,
 }) => {
@@ -48,34 +50,30 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         setInput('');
         setLoading(true);
 
-        const safeMissions = missions?.map(m => `"${m.title || 'Untitled Mission'}" with priority ${m.priority || 'N/A'}`).join(', ') || 'None';
+        const safeMissions = missions?.map(m => `"${m.title || 'Untitled Mission'}" (Priority: ${m.priority || 'N/A'})`).join(', ') || 'None';
         const safeGoal = currentRoadmap?.goal || 'None defined';
-        const safeProgress = currentRoadmap ? `Day ${currentRoadmap.day || currentDay || 1} of ${currentRoadmap.days || 'N/A'}` : 'No roadmap active';
+        const safeProgress = currentRoadmap ? `Day ${currentDay || 1} of ${currentRoadmap.days || 'N/A'}` : 'No roadmap active';
         const safeStatus = hasIncompleteTasks ? 'Falling behind on some tasks.' : 'On track.';
 
         const contextPrompt = `
-            You are Nyx, a tough-but-fair AI accountability coach with a cyberpunk theme. You are direct, sharp, and focused on helping the user achieve their goals. You can also handle general conversation, but always bring it back to the user's objectives.
+            You are Nyx, a tough-but-fair AI accountability coach with a cyberpunk theme. You are direct, sharp, and focused on helping the user achieve their goals. You can handle general conversation, but always bring it back to the user's objectives.
 
-            Here is the user's current status:
+            HERE IS ALL OF THE USER'S CURRENT DATA:
             - Active Missions: ${safeMissions}
             - Current Roadmap Goal: "${safeGoal}"
             - Progress: ${safeProgress}
-            - Status: ${safeStatus}
+            - Current Streak: ${stats?.streak || 0} days.
+            - Roadmap Status: ${safeStatus}
+            - All Tasks Completed So Far: ${allTasksCompleted}
 
-            Previous conversation with you (Nyx):
+            PREVIOUS CONVERSATION HISTORY WITH YOU (NYX):
             ${messages.map(m => `${m.role}: ${m.text}`).join('\n')}
             
-            User's new message: "${input}"
+            USER'S NEW MESSAGE: "${input}"
 
-            Based on all this context, provide a response that is in character. Be direct, ask clarifying questions, and push the user to stay on target. If they are making excuses, call them out. If they are doing well, give them a sharp, concise nod of approval.
+            Based on ALL this context, provide a response that is in character. Be direct, ask clarifying questions, and push the user to stay on target. If they are making excuses, call them out. If they are doing well, give them a sharp, concise nod of approval.
         `;
         
-        if (!contextPrompt.trim()) {
-            toast.error("Could not send message: context is missing.");
-            setLoading(false);
-            return;
-        }
-
         try {
             const response = await fetchWithFallback(
                 API_BASE_URL,
@@ -85,8 +83,14 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: contextPrompt }] }] }),
-                }
+                },
+                (message) => toast.info(message)
             );
+
+            if (!response.ok) {
+                if (response.status === 429) throw new Error("API quota exceeded. Please try again later.");
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
             const data = await response.json();
             const modelResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -94,7 +98,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
             if (modelResponse) {
                 setMessages(prev => [...prev, { role: 'model', text: modelResponse }]);
             } else {
-                throw new Error(data.error?.message || "Model response was empty.");
+                throw new Error(data.error?.message || "Model response was empty or invalid.");
             }
 
         } catch (error: any) {
