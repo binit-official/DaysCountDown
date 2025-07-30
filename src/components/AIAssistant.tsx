@@ -1,3 +1,5 @@
+// src/components/AIAssistant.tsx
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +35,7 @@ export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksComple
     const initialMessage = isNewUser
         ? "Welcome! I'm Nyx, your AI assistant. To get started, let's create your first long-term mission in the 'Mission Control' panel on the left."
         : hasIncompleteTasks
-        ? `You have incomplete tasks from previous days. You can either infuse them into your schedule or ask me to generate a completely new, optimized plan for the remaining days.`
+        ? `You have incomplete tasks from previous days. You can either infuse them into your schedule or ask me to generate a completely new, optimized plan for the remaining days. You can also chat with me for advice or feedback.`
         : "Hello! How can I help you adapt your mission today? Ask me for advice, feedback on your progress, or to adjust your plan.";
     
     const handleSendMessage = async () => {

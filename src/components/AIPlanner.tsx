@@ -1,3 +1,5 @@
+// src/components/AIPlanner.tsx
+
 import React, { useState } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -8,6 +10,8 @@ import { Card } from '@/components/ui/card';
 import { Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { User } from 'firebase/auth';
+import { fetchWithRetry } from '@/lib/utils'; // Import the updated utility
+import { toast } from 'sonner'; // Import toast for better feedback
 
 // ... (interfaces remain the same)
 interface DailyTask {
@@ -36,12 +40,10 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user }: AIPlannerProps) => {
   const [goal, setGoal] = useState('');
   const [days, setDays] = useState(45);
-  // ... (rest of the component is the same)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const generateRoadmap = async () => {
-    // ... (logic is the same)
     if (!goal || !days) {
         setError("A goal and number of days are required.");
         return;
@@ -56,6 +58,7 @@ const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user 
     }
     setLoading(true);
     setError(null);
+    toast.info("Generating your new mission roadmap... This might take a moment.");
 
     const prompt = `
       You must create a detailed roadmap for the exact number of days specified. Do not change the number of days.
@@ -74,13 +77,12 @@ const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user 
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetchWithRetry(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        timeout: 60000, // 60-second timeout for this long-running request
       });
-
-      if (!response.ok) throw new Error((await response.json()).error?.message || 'API request failed');
 
       const data = await response.json();
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -105,6 +107,7 @@ const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user 
 
       onRoadmapChange(newRoadmap);
       onRoadmapGenerate(days);
+      toast.success("New roadmap generated successfully!");
 
       const docRef = doc(db, 'users', user.uid, 'data', 'roadmap');
       await setDoc(docRef, newRoadmap, { merge: true });
@@ -112,6 +115,7 @@ const AIPlanner = ({ onRoadmapChange, onRoadmapGenerate, disabled = false, user 
     } catch (error: any) {
       console.error('Error generating roadmap:', error);
       setError(error.message || 'Failed to generate roadmap.');
+      toast.error(`Roadmap generation failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
