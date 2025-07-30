@@ -1,153 +1,188 @@
-// src/components/AIAssistant.tsx
-
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, Bot, User, CornerDownLeft, X } from 'lucide-react';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Textarea } from './ui/textarea';
-import { ScrollArea } from './ui/scroll-area';
-import { fetchWithRetry } from '@/lib/utils';
+import { Bot, User, CornerDownLeft, Zap, Wind, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { fetchWithRace } from '@/lib/utils';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-interface Message {
-    sender: 'user' | 'ai';
-    text: string;
-}
+const GEMINI_API_KEY_2 = import.meta.env.VITE_GEMINI_API_KEY_2;
+const API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
 interface AIAssistantProps {
-  currentRoadmap: any | null;
-  hasIncompleteTasks: boolean;
-  allTasksCompleted: boolean;
-  currentDay: number;
-  isNewUser: boolean;
-  onInfuseTasks: () => void;
-  onReplan: () => Promise<void>;
+    isOpen: boolean;
+    onOpenChange: (isOpen: boolean) => void;
+    isOtherAssistantOpen: boolean;
+    missions: any[];
+    currentRoadmap: any;
+    hasIncompleteTasks: boolean;
+    allTasksCompleted: boolean;
+    currentDay: number;
+    onInfuseTasks: () => void;
+    onReplan: () => void;
 }
 
-export const AIAssistant = ({ currentRoadmap, hasIncompleteTasks, allTasksCompleted, currentDay, isNewUser, onInfuseTasks, onReplan }: AIAssistantProps) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
+export const AIAssistant: React.FC<AIAssistantProps> = ({
+    isOpen,
+    onOpenChange,
+    isOtherAssistantOpen,
+    missions,
+    currentRoadmap,
+    hasIncompleteTasks,
+    allTasksCompleted,
+    currentDay,
+    onInfuseTasks,
+    onReplan,
+}) => {
+    const [messages, setMessages] = useState<{ role: 'user' | 'model', text: string }[]>([]);
     const [input, setInput] = useState('');
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [loading, setLoading] = useState(false);
 
-    const initialMessage = isNewUser
-        ? "Welcome! I'm Nyx, your AI assistant. To get started, let's create your first long-term mission in the 'Mission Control' panel on the left."
-        : hasIncompleteTasks
-        ? `You have incomplete tasks from previous days. You can either infuse them into your schedule or ask me to generate a completely new, optimized plan for the remaining days. You can also chat with me for advice or feedback.`
-        : "Hello! How can I help you adapt your mission today? Ask me for advice, feedback on your progress, or to adjust your plan.";
-    
-    const handleSendMessage = async () => {
+    const handleSend = async () => {
         if (!input.trim()) return;
 
-        const newMessages: Message[] = [...messages, { sender: 'user', text: input }];
-        setMessages(newMessages);
+        const newUserMessage = { role: 'user' as const, text: input };
+        setMessages(prev => [...prev, newUserMessage]);
         setInput('');
         setLoading(true);
 
-        const conversationHistory = newMessages.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
-        
-        const prompt = `
-            You are an AI assistant named "Nyx" for a goal-setting app called "Days Count Down".
-            Your primary role is to provide strategic advice, motivation, and help the user adapt their plans.
-            Do NOT answer general knowledge questions. If the user asks for something outside of planning or motivation, gently guide them back to their mission.
+        const safeMissions = missions?.map(m => `"${m.title || 'Untitled Mission'}" with priority ${m.priority || 'N/A'}`).join(', ') || 'None';
+        const safeGoal = currentRoadmap?.goal || 'None defined';
+        const safeProgress = currentRoadmap ? `Day ${currentRoadmap.day || currentDay || 1} of ${currentRoadmap.days || 'N/A'}` : 'No roadmap active';
+        const safeStatus = hasIncompleteTasks ? 'Falling behind on some tasks.' : 'On track.';
 
-            Current Context:
-            - User's Goal: "${currentRoadmap?.goal || 'Not set'}"
-            - Total Days in Plan: ${currentRoadmap?.days || 'N/A'}
-            - Today is Day: ${currentDay}
-            - All tasks are completed so far: ${!hasIncompleteTasks}
+        const contextPrompt = `
+            You are Nyx, a tough-but-fair AI accountability coach with a cyberpunk theme. You are direct, sharp, and focused on helping the user achieve their goals. You can also handle general conversation, but always bring it back to the user's objectives.
 
-            Conversation History:
-            ${conversationHistory}
-            Nyx:
+            Here is the user's current status:
+            - Active Missions: ${safeMissions}
+            - Current Roadmap Goal: "${safeGoal}"
+            - Progress: ${safeProgress}
+            - Status: ${safeStatus}
+
+            Previous conversation with you (Nyx):
+            ${messages.map(m => `${m.role}: ${m.text}`).join('\n')}
+            
+            User's new message: "${input}"
+
+            Based on all this context, provide a response that is in character. Be direct, ask clarifying questions, and push the user to stay on target. If they are making excuses, call them out. If they are doing well, give them a sharp, concise nod of approval.
         `;
+        
+        if (!contextPrompt.trim()) {
+            toast.error("Could not send message: context is missing.");
+            setLoading(false);
+            return;
+        }
 
         try {
-            const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-            });
+            const response = await fetchWithRace(
+                API_BASE_URL,
+                GEMINI_API_KEY,
+                GEMINI_API_KEY_2,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: contextPrompt }] }] }),
+                }
+            );
+
             const data = await response.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-                setMessages(prev => [...prev, { sender: 'ai', text: text.trim() }]);
+            const modelResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (modelResponse) {
+                setMessages(prev => [...prev, { role: 'model', text: modelResponse }]);
+            } else {
+                throw new Error(data.error?.message || "Model response was empty.");
             }
+
         } catch (error: any) {
-            toast.error(`Failed to get response from Nyx: ${error.message}`);
+            toast.error(`Nyx is unavailable: ${error.message}`);
+            setInput(input);
+            setMessages(prev => prev.filter(m => m !== newUserMessage));
         } finally {
             setLoading(false);
         }
     };
-
-    if (!isOpen) {
-        return (
-            <div className="fixed bottom-8 right-8 z-50">
-                <Button onClick={() => setIsOpen(true)} className="h-16 w-16 rounded-full shadow-lg">
-                    <Sparkles className="w-8 h-8" />
-                </Button>
-            </div>
-        );
-    }
     
-    return (
-        <div className="fixed bottom-8 right-8 z-50">
-            <Card className="flex flex-col h-[480px] w-96 neon-border bg-card/90 backdrop-blur-sm">
-                <CardHeader className="flex flex-row items-center justify-between p-3 border-b border-secondary/20">
-                    <CardTitle className="flex items-center text-base">
-                        <Sparkles className="w-5 h-5 mr-2" />
-                        AI Assistant (Nyx)
-                    </CardTitle>
-                    <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="h-7 w-7"><X className="w-4 h-4" /></Button>
-                </CardHeader>
-                <ScrollArea className="flex-1">
-                    <CardContent className="p-3 space-y-3">
-                        <div className="flex items-start gap-2">
-                           <Bot className="w-5 h-5 text-secondary flex-shrink-0 mt-1" />
-                           <div className="p-2 rounded-lg bg-secondary/10 max-w-xs">
-                                <p className="text-sm">{initialMessage}</p>
-                                {hasIncompleteTasks && (
-                                    <div className="flex flex-col gap-2 mt-3">
-                                        <Button size="sm" onClick={onInfuseTasks}>Infuse Incomplete Tasks</Button>
-                                        <Button size="sm" variant="outline" onClick={onReplan}>Re-plan with AI</Button>
-                                    </div>
-                                )}
-                           </div>
-                        </div>
+    const QuickActionButton: React.FC<{ Icon: React.ElementType, text: string, onClick: () => void }> = ({ Icon, text, onClick }) => (
+        <Button variant="outline" className="w-full justify-start gap-2" onClick={onClick}>
+            <Icon className="h-4 w-4 text-primary" />
+            {text}
+        </Button>
+    );
 
-                        {messages.map((msg, index) => (
-                            <div key={index} className={`flex items-start gap-2 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
-                                {msg.sender === 'ai' && <Bot className="w-5 h-5 text-secondary flex-shrink-0 mt-1" />}
-                                <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-primary/20' : 'bg-secondary/10'}`}>
-                                    <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                                </div>
-                                {msg.sender === 'user' && <User className="w-5 h-5 text-primary flex-shrink-0 mt-1" />}
-                            </div>
-                        ))}
-                         {loading && (
-                            <div className="flex justify-start">
-                                <Bot className="w-5 h-5 text-secondary animate-spin" />
-                            </div>
-                        )}
-                    </CardContent>
-                </ScrollArea>
-                 <div className="p-2 border-t border-secondary/20">
-                    <div className="relative">
-                        <Textarea
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Ask for advice or feedback..."
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-                            className="pr-10 bg-background/50 text-sm"
-                            rows={1}
-                            disabled={loading}
-                        />
-                        <Button size="icon" onClick={handleSendMessage} disabled={loading} className="absolute right-1.5 bottom-1 h-7 w-7"><CornerDownLeft className="w-4 h-4" /></Button>
-                    </div>
+    return (
+        <>
+            {!isOtherAssistantOpen && (
+                <div className="fixed bottom-4 right-4 z-50">
+                    <Button onClick={() => onOpenChange(!isOpen)} size="icon" className="rounded-full w-16 h-16 shadow-lg shadow-primary/30">
+                        <Bot className="h-8 w-8" />
+                    </Button>
                 </div>
-            </Card>
-        </div>
+            )}
+
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="fixed bottom-24 right-4 z-[60]"
+                    >
+                        <Card className="w-96 neon-border bg-background/80 backdrop-blur-md">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="flex items-center gap-2"><Bot /> Nyx</CardTitle>
+                                <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-64 overflow-y-auto space-y-4 pr-2">
+                                    {messages.length === 0 && (
+                                        <div className="text-sm text-muted-foreground space-y-4">
+                                            <p>Report status or ask for a new plan.</p>
+                                            {hasIncompleteTasks && <QuickActionButton Icon={Wind} text="Infuse missed tasks" onClick={onInfuseTasks} />}
+                                            {currentRoadmap && <QuickActionButton Icon={Zap} text="Re-plan with AI" onClick={onReplan} />}
+                                        </div>
+                                    )}
+                                    {messages.map((msg, i) => (
+                                        <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            {msg.role === 'model' && <Bot className="h-5 w-5 text-primary flex-shrink-0" />}
+                                            <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                                {msg.text}
+                                            </div>
+                                            {msg.role === 'user' && <User className="h-5 w-5 flex-shrink-0" />}
+                                        </div>
+                                    ))}
+                                    {loading && (
+                                        <div className="flex justify-start">
+                                            <div className="flex items-center gap-2">
+                                                 <Bot className="h-5 w-5 text-primary flex-shrink-0 animate-pulse" />
+                                                 <span className="text-xs text-muted-foreground">Nyx is processing...</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4 flex items-center gap-2">
+                                    <Textarea
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        placeholder="Report status..."
+                                        className="flex-grow"
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                                        disabled={loading}
+                                    />
+                                    <Button onClick={handleSend} disabled={loading || !input.trim()} size="icon">
+                                        <CornerDownLeft className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </>
     );
 };

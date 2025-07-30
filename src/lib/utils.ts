@@ -1,47 +1,47 @@
-// src/lib/utils.ts
-
-import { clsx, type ClassValue } from "clsx"
+import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const fetchWithRetry = async (url: string, options: RequestInit & { timeout?: number }, retries = 4, backoff = 3000) => {
+export const fetchWithRetry = async (url: string, options: RequestInit, retries = 3, delay = 1000) => {
   for (let i = 0; i < retries; i++) {
-    const controller = new AbortController();
-    const { signal } = controller;
-    const timeout = options.timeout || 15000; // Default timeout of 15 seconds
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
     try {
-      const response = await fetch(url, { ...options, signal });
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        return response;
+      const response = await fetch(url, options);
+      if (response.status === 429 || response.status >= 500) {
+        console.warn(`Request failed with status ${response.status}. Retrying...`);
+        throw new Error(`Server error: ${response.status}`);
       }
-
-      if (response.status === 429) { // Quota exceeded
-        if (i < retries - 1) {
-          const waitTime = backoff * Math.pow(2, i); // Exponential backoff
-          await new Promise(res => setTimeout(res, waitTime));
-          continue;
-        } else {
-          throw new Error('API quota exceeded. Please try again later.');
-        }
+      return response;
+    } catch (error) {
+      if (i < retries - 1) {
+        await new Promise(res => setTimeout(res, delay * (i + 1)));
       } else {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || `API request failed with status ${response.status}`);
+        throw error;
       }
-    } catch (error: any) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-             if (i < retries - 1) continue; // Retry on timeout
-             throw new Error('API request timed out after multiple retries.');
-        }
-        throw error; // Rethrow other errors
     }
   }
-  throw new Error('API request failed after multiple retries.');
+  throw new Error('Failed after multiple retries');
+};
+
+// The 'export' keyword was missing here. It has been added.
+export const fetchWithRace = async (
+    baseUrl: string,
+    key1: string,
+    key2: string,
+    options: RequestInit
+) => {
+    if (!key2) {
+        const url = `${baseUrl}?key=${key1}`;
+        return fetchWithRetry(url, options);
+    }
+
+    const url1 = `${baseUrl}?key=${key1}`;
+    const url2 = `${baseUrl}?key=${key2}`;
+
+    const promise1 = fetchWithRetry(url1, options);
+    const promise2 = fetchWithRetry(url2, options);
+
+    return Promise.race([promise1, promise2]);
 };

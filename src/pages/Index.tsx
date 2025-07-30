@@ -1,5 +1,3 @@
-// src/pages/Index.tsx
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CountdownTimer } from '@/components/CountdownTimer';
@@ -13,7 +11,7 @@ import { Logo } from '@/components/Logo';
 import { UserNav } from '@/components/UserNav';
 import { Card } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction, collection, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { AlertTriangle, Zap, Flame, Target } from 'lucide-react';
 import { Footer } from '@/components/Footer';
 import { isToday, isYesterday, startOfWeek, endOfWeek, eachDayOfInterval, format, isWithinInterval } from 'date-fns';
@@ -25,10 +23,12 @@ import { Guiding } from '@/components/Guiding';
 import { FeelingTracker } from '@/components/FeelingTracker';
 import { StudyTimer, StudyLog } from '@/components/StudyTimer';
 import { ALL_ACHIEVEMENTS } from '@/components/Achievements';
-import { fetchWithRetry } from '@/lib/utils';
+import { fetchWithRace } from '@/lib/utils';
 import { RoadmapPreview } from '@/components/RoadmapPreview';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_API_KEY_2 = import.meta.env.VITE_GEMINI_API_KEY_2;
+const API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
 const Index = () => {
     const { user } = useAuth();
@@ -50,8 +50,13 @@ const Index = () => {
     const initialCheckDone = useRef(false);
     const [proposedRoadmap, setProposedRoadmap] = useState<any | null>(null);
 
-    // ... (All the useEffect and achievement logic remains the same)
-    
+    const [journalEntries, setJournalEntries] = useState<any[]>([]);
+    const [moodAndFeelingData, setMoodAndFeelingData] = useState<any>({});
+
+    const [isNyxAssistantOpen, setIsNyxAssistantOpen] = useState(false);
+    const [isGuidingOpen, setIsGuidingOpen] = useState(false);
+
+
     useEffect(() => {
         sessionSecondsRef.current = sessionSeconds;
     }, [sessionSeconds]);
@@ -211,7 +216,6 @@ const Index = () => {
 
         if (!sourceTask || !destTask) return;
         
-        // Ensure subtasks are initialized
         if (!sourceTask.subTasks || sourceTask.subTasks.length === 0) {
             sourceTask.subTasks = sourceTask.task.split(';').map((t: string) => ({text: t.trim(), completed: false}));
         }
@@ -222,11 +226,9 @@ const Index = () => {
         const [relocatedTask] = sourceTask.subTasks.splice(taskIndex, 1);
         destTask.subTasks.push(relocatedTask);
 
-        // Rebuild the task string from subtasks
         sourceTask.task = sourceTask.subTasks.map((t:any) => t.text).join('; ');
         destTask.task = destTask.subTasks.map((t:any) => t.text).join('; ');
 
-        // If source day is now empty, mark it as complete
         if(sourceTask.subTasks.length === 0){
             sourceTask.completed = true;
         }
@@ -361,18 +363,16 @@ const Index = () => {
                 start.setHours(0, 0, 0, 0);
                 now.setHours(0, 0, 0, 0);
                 const day = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                return day > 0 ? day : 1;
+                return day; 
             }
             return 1;
         };
 
-        if (roadmap?.dailyTasks && roadmap.startDate) {
+        if (roadmap?.startDate) {
             const day = calculateCurrentDay(roadmap.startDate);
-            setCurrentDay(day);
-            if(selectedDay < day) {
-                // don't change selected day if it's in the past
-            } else {
-                 setSelectedDay(day);
+            setCurrentDay(day > 0 ? day : 1);
+            if (selectedDay < day || day > 0) {
+                setSelectedDay(day > 0 ? day : 1);
             }
             const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
             setHasIncompleteTasks(incomplete);
@@ -420,31 +420,11 @@ const Index = () => {
             if (docSnap.metadata.hasPendingWrites) return;
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                
-                const toValidDate = (d: any) => {
-                    if (!d) return null;
-                    if (d.toDate) return d.toDate();
-                    if (d instanceof Date) return d;
-                    const parsed = new Date(d);
-                    return isNaN(parsed.getTime()) ? null : parsed;
-                };
-
-                const convertedDailyTasks = data.dailyTasks?.map((task: any) => ({
-                    ...task,
-                    subTasks: task.subTasks?.map((sub: any) => ({
-                        ...sub,
-                        studyLogs: sub.studyLogs?.map((log: any) => ({
-                            ...log,
-                            timestamp: toValidDate(log.timestamp),
-                        })) || [],
-                    })) || [],
-                }));
-                const newRoadmap = { 
+                const toValidDate = (d: any) => d?.toDate ? d.toDate() : (d ? new Date(d) : null);
+                setRoadmap({ 
                     ...data, 
                     startDate: toValidDate(data.startDate),
-                    dailyTasks: convertedDailyTasks 
-                };
-                setRoadmap(newRoadmap);
+                });
             } else {
                 setRoadmap(null);
             }
@@ -463,10 +443,24 @@ const Index = () => {
             }
         });
 
+        const journalQuery = query(collection(db, 'users', user.uid, 'journal'), orderBy('date', 'desc'), limit(10));
+        const unsubscribeJournal = onSnapshot(journalQuery, (snapshot) => {
+            setJournalEntries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+
+        const moodDocRef = doc(db, 'users', user.uid, 'data', 'moods');
+        const unsubscribeMoods = onSnapshot(moodDocRef, (docSnap) => {
+            if(docSnap.exists()){
+                setMoodAndFeelingData(docSnap.data());
+            }
+        });
+
         return () => {
             unsubscribeTasks();
             unsubscribeRoadmap();
             unsubscribeStats();
+            unsubscribeJournal();
+            unsubscribeMoods();
         };
     }, [user]);
 
@@ -517,7 +511,7 @@ const Index = () => {
         
         toast.success(`🔥 Streak extended to ${newStreak} days!`);
     };
-
+    
     const revertStreakForToday = async () => {
         if (!user) return;
         const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
@@ -668,11 +662,16 @@ const Index = () => {
         `;
 
         try {
-            const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-            });
+            const response = await fetchWithRace(
+                API_BASE_URL,
+                GEMINI_API_KEY,
+                GEMINI_API_KEY_2,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+                }
+            );
 
             const data = await response.json();
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -761,7 +760,7 @@ const Index = () => {
                                 <div className="text-center py-20">
                                     <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-red-500 animate-pulse" />
                                     <h3 className="text-3xl font-black mb-2 text-red-500">NO MISSION SELECTED</h3>
-                                    {isNewUser && <p className="text-muted-foreground">Follow the guide in the bottom-right chat to create one.</p>}
+                                    {isNewUser && <p className="text-muted-foreground">Follow the guide to create one.</p>}
                                 </div>
                             )}
                         </Card>
@@ -779,7 +778,6 @@ const Index = () => {
                         />
                         <DashboardStats stats={stats} unlockedAchievements={unlockedAchievements} />
                         <MoodTracker onMoodLog={() => handleStatEvent('mood_logged')} />
-                        <Guiding />
                     </div>
                 </div>
                 <div className="mt-8">
@@ -789,12 +787,24 @@ const Index = () => {
                 <div className="mt-8 lg:mt-12">
                     <Roadmap roadmap={roadmap} selectedDay={selectedDay} onSelectDay={setSelectedDay} currentDay={currentDay} onShift={handleShiftRoadmap}/>
                 </div>
+                
+                <Guiding 
+                    isOpen={isGuidingOpen} 
+                    onOpenChange={setIsGuidingOpen} 
+                    isOtherAssistantOpen={isNyxAssistantOpen}
+                    journal={journalEntries}
+                    moods={moodAndFeelingData}
+                    stats={stats}
+                />
                 <AIAssistant
+                    isOpen={isNyxAssistantOpen}
+                    onOpenChange={setIsNyxAssistantOpen}
+                    isOtherAssistantOpen={isGuidingOpen}
+                    missions={tasks}
                     currentRoadmap={roadmap}
                     hasIncompleteTasks={hasIncompleteTasks}
                     allTasksCompleted={allTasksCompleted}
                     currentDay={currentDay}
-                    isNewUser={isNewUser}
                     onInfuseTasks={handleInfuseTasks}
                     onReplan={handleReplanWithAI}
                 />
@@ -829,4 +839,4 @@ const Index = () => {
     );
 };
 
-export default Index; 
+export default Index;
