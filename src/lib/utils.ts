@@ -5,6 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// This function remains the same, it's used by our new fallback function.
 export const fetchWithRetry = async (url: string, options: RequestInit, retries = 3, delay = 1000) => {
   for (let i = 0; i < retries; i++) {
     try {
@@ -25,23 +26,31 @@ export const fetchWithRetry = async (url: string, options: RequestInit, retries 
   throw new Error('Failed after multiple retries');
 };
 
-// The 'export' keyword was missing here. It has been added.
-export const fetchWithRace = async (
+
+// This is the new, more efficient fallback function that replaces the race logic.
+export const fetchWithFallback = async (
     baseUrl: string,
     key1: string,
     key2: string,
     options: RequestInit
 ) => {
-    if (!key2) {
-        const url = `${baseUrl}?key=${key1}`;
-        return fetchWithRetry(url, options);
-    }
-
     const url1 = `${baseUrl}?key=${key1}`;
-    const url2 = `${baseUrl}?key=${key2}`;
-
-    const promise1 = fetchWithRetry(url1, options);
-    const promise2 = fetchWithRetry(url2, options);
-
-    return Promise.race([promise1, promise2]);
+    
+    try {
+        // First, try the primary key
+        console.log("Attempting API call with primary key...");
+        return await fetchWithRetry(url1, options);
+    } catch (error) {
+        console.warn(`Primary API key failed: ${error}. Attempting fallback...`);
+        
+        // If the first key fails and a second key exists, try the fallback key
+        if (key2) {
+            const url2 = `${baseUrl}?key=${key2}`;
+            console.log("Attempting API call with fallback key...");
+            return await fetchWithRetry(url2, options);
+        }
+        
+        // If there's no second key or the second one also fails, throw the error
+        throw error;
+    }
 };

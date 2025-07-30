@@ -23,7 +23,7 @@ import { Guiding } from '@/components/Guiding';
 import { FeelingTracker } from '@/components/FeelingTracker';
 import { StudyTimer, StudyLog } from '@/components/StudyTimer';
 import { ALL_ACHIEVEMENTS } from '@/components/Achievements';
-import { fetchWithRace } from '@/lib/utils';
+import { fetchWithFallback } from '@/lib/utils';
 import { RoadmapPreview } from '@/components/RoadmapPreview';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -662,7 +662,7 @@ const Index = () => {
         `;
 
         try {
-            const response = await fetchWithRace(
+            const response = await fetchWithFallback(
                 API_BASE_URL,
                 GEMINI_API_KEY,
                 GEMINI_API_KEY_2,

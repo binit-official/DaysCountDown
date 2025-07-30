@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { fetchWithRace } from '@/lib/utils';
+import { fetchWithFallback } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -43,7 +43,7 @@ const AIPlanner: React.FC<AIPlannerProps> = ({ onRoadmapChange, onRoadmapGenerat
         `;
         
         try {
-            const response = await fetchWithRace(
+            const response = await fetchWithFallback(
                 API_BASE_URL,
                 GEMINI_API_KEY,
                 GEMINI_API_KEY_2,

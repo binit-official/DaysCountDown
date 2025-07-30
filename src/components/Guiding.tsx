@@ -5,7 +5,7 @@ import { Textarea } from './ui/textarea';
 import { Sparkles, User, CornerDownLeft, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { fetchWithRace } from '@/lib/utils';
+import { fetchWithFallback } from '@/lib/utils';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_API_KEY_2 = import.meta.env.VITE_GEMINI_API_KEY_2;
@@ -52,7 +52,7 @@ export const Guiding: React.FC<SallyProps> = ({ isOpen, onOpenChange, isOtherAss
         `;
 
         try {
-            const response = await fetchWithRace(
+            const response = await fetchWithFallback(
                 API_BASE_URL,
                 GEMINI_API_KEY,
                 GEMINI_API_KEY_2,
