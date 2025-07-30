@@ -1,133 +1,219 @@
-import React from 'react';
-import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { CheckCircle, AlertTriangle, Timer } from 'lucide-react';
-import { format } from 'date-fns';
-import { Button } from './ui/button';
-import { StudyLog } from './StudyTimer';
+// src/components/DailyTaskCard.tsx
 
-interface DailyTaskCardProps {
-  roadmap: any | null;
-  selectedDay: number;
-  onRoadmapUpdate: (updatedTasks: any[], completedTask?: any) => void;
-  currentDay: number;
-  onOpenTimer: (day: number, subTaskIndex: number, taskText: string, logs: StudyLog[]) => void;
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Clock, Move } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+
+
+// We need to define the types here as they are not in a central file
+export interface StudyLog {
+    id: string;
+    duration: number;
+    timestamp: Date;
+}
+export interface SubTask {
+    text: string;
+    completed: boolean;
+    studyLogs?: StudyLog[];
+}
+export interface DailyTask {
+    day: number;
+    task: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard' | 'Challenge';
+    completed: boolean;
+    subTasks?: SubTask[];
+    date?: string;
+}
+export interface Roadmap {
+    id: string;
+    goal: string;
+    startDate?: Date;
+    days: number;
+    dailyTasks: DailyTask[];
 }
 
-export const DailyTaskCard = ({ roadmap, selectedDay, onRoadmapUpdate, currentDay, onOpenTimer }: DailyTaskCardProps) => {
 
-  if (!roadmap || !roadmap.dailyTasks || roadmap.dailyTasks.length === 0) {
-    return null;
-  }
+interface DailyTaskCardProps {
+    roadmap: Roadmap | null;
+    selectedDay: number;
+    currentDay: number;
+    onRoadmapUpdate: (updatedDailyTasks: DailyTask[], completedTask?: DailyTask) => void;
+    onOpenTimer: (day: number, subTaskIndex: number, taskText: string, logs: StudyLog[]) => void;
+    onSetStartDate: (date: Date) => void;
+    onRelocateTask: (sourceDay: number, taskIndex: number, destinationDay: number) => void;
+}
 
-  const startDate = roadmap.startDate ? (roadmap.startDate.toDate ? roadmap.startDate.toDate() : new Date(roadmap.startDate)) : new Date();
-  
-  const handleSubTaskCompletion = (day: number, subTaskIndex: number, completed: boolean) => {
-    let justCompletedTask: any = null;
-    const updatedTasks = roadmap.dailyTasks.map((task: any) => {
-      if (task.day === day) {
-        const wasPreviouslyComplete = task.completed;
-        const subTasks = task.task.split(';').map((s: string, i: number) => ({
-            text: s.trim(),
-            completed: i === subTaskIndex ? completed : (task.subTasks?.[i]?.completed ?? false),
-            studyLogs: task.subTasks?.[i]?.studyLogs ?? [],
-        }));
-        const allCompleted = subTasks.every((st: any) => st.completed);
+export const DailyTaskCard: React.FC<DailyTaskCardProps> = ({
+    roadmap,
+    selectedDay,
+    currentDay,
+    onRoadmapUpdate,
+    onOpenTimer,
+    onSetStartDate,
+    onRelocateTask,
+}) => {
+    const [newStartDate, setNewStartDate] = React.useState<Date | undefined>();
+    const [relocatingTask, setRelocatingTask] = React.useState<{taskIndex: number, destDay: number} | null>(null);
 
-        if (allCompleted && !wasPreviouslyComplete) {
-            justCompletedTask = { ...task, subTasks, completed: allCompleted };
+    const taskForSelectedDay = roadmap?.dailyTasks.find(t => t.day === selectedDay);
+    const isRoadmapFuture = roadmap?.startDate && new Date(roadmap.startDate) > new Date();
+
+    const handleToggleSubTask = (subTaskIndex: number) => {
+        if (!roadmap || !taskForSelectedDay) return;
+
+        const updatedDailyTasks = roadmap.dailyTasks.map(dayTask => {
+            if (dayTask.day === selectedDay) {
+                const subTasks = (dayTask.subTasks && dayTask.subTasks.length > 0)
+                    ? dayTask.subTasks
+                    : dayTask.task.split(';').map(t => ({ text: t.trim(), completed: false, studyLogs: [] }));
+
+                const updatedSubTasks = subTasks.map((sub, i) =>
+                    i === subTaskIndex ? { ...sub, completed: !sub.completed } : sub
+                );
+
+                const areAllSubTasksComplete = updatedSubTasks.every(sub => sub.completed);
+                return { ...dayTask, subTasks: updatedSubTasks, completed: areAllSubTasksComplete };
+            }
+            return dayTask;
+        });
+        
+        const completedTask = updatedDailyTasks.find(t => t.day === selectedDay);
+        onRoadmapUpdate(updatedDailyTasks, completedTask?.completed ? completedTask : undefined);
+    };
+
+    const subTasks = React.useMemo(() => {
+        if (!taskForSelectedDay) return [];
+        if (taskForSelectedDay.subTasks && taskForSelectedDay.subTasks.length > 0) {
+            return taskForSelectedDay.subTasks;
         }
-        return { ...task, subTasks, completed: allCompleted };
-      }
-      return task;
-    });
-    onRoadmapUpdate(updatedTasks, justCompletedTask);
-  };
-  
-  const formatStudyTime = (logs: StudyLog[] | undefined) => {
-    if (!logs || logs.length === 0) return null;
-    const totalSeconds = logs.reduce((acc, log) => acc + log.duration, 0);
-    if (totalSeconds === 0) return null;
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+        return taskForSelectedDay.task.split(';').map(t => ({ text: t.trim(), completed: false, studyLogs: [] }));
+    }, [taskForSelectedDay]);
+
+    const handleConfirmRelocation = () => {
+        if(relocatingTask && relocatingTask.destDay) {
+            onRelocateTask(selectedDay, relocatingTask.taskIndex, relocatingTask.destDay);
+            setRelocatingTask(null);
+        }
+    };
     
-    if (hours > 0) return `${hours}h ${minutes}m logged`;
-    if (minutes > 0) return `${minutes}m ${seconds}s logged`;
-    return `${seconds}s logged`;
-  };
-
-  const selectedDayTask = roadmap.dailyTasks.find((task: any) => task.day === selectedDay);
-  const subTasks = selectedDayTask?.task.split(';').map((s: string) => s.trim()).filter(Boolean) || [];
-  const previousIncompleteTasks = roadmap.dailyTasks.filter((task: any) => task.day < currentDay && !task.completed);
-  const selectedDate = new Date(startDate);
-  if (!isNaN(selectedDate.getTime())) {
-    selectedDate.setDate(startDate.getDate() + selectedDay - 1);
-  }
-
-  return (
-      <Card className="p-4 md:p-6 neon-border bg-card/90 backdrop-blur-sm border-primary/50">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-primary neon-text">Mission for Day {selectedDay}</h3>
-          <span className="text-sm text-muted-foreground">{!isNaN(selectedDate.getTime()) ? format(selectedDate, 'MMMM d, yyyy') : 'Invalid Date'}</span>
-        </div>
-
-        {previousIncompleteTasks.length > 0 && selectedDay >= currentDay && (
-          <div className="mb-4 p-3 rounded-md border border-destructive/50 bg-destructive/10 text-destructive">
-            <div className="flex items-center">
-              <AlertTriangle className="w-5 h-5 mr-2" />
-              <h4 className="font-bold">INCOMPLETE TASKS!</h4>
-            </div>
-            <p className="text-xs mt-1">You have unfinished missions from previous days.</p>
-          </div>
-        )}
-
-        {selectedDayTask && subTasks.length > 0 ? (
-          <div className="space-y-3">
-            {selectedDayTask.completed && (
-              <div className="flex items-center space-x-2 text-green-400 p-2 bg-green-500/10 rounded-md">
-                <CheckCircle className="w-5 h-5" />
-                <p className="font-bold text-sm">Day Complete!</p>
-              </div>
-            )}
-            {subTasks.map((subTask: string, index: number) => {
-              const subTaskData = selectedDayTask.subTasks?.[index];
-              const studyTime = formatStudyTime(subTaskData?.studyLogs);
-              return (
-                <div key={index} className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3">
-                        <Checkbox
-                            id={`task-${selectedDay}-${index}`}
-                            checked={subTaskData?.completed ?? false}
-                            onCheckedChange={(checked) => handleSubTaskCompletion(selectedDay, index, !!checked)}
-                            className="neon-border mt-1"
-                        />
-                        <div>
-                            <label
-                                htmlFor={`task-${selectedDay}-${index}`}
-                                className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
-                                subTaskData?.completed ? 'line-through text-muted-foreground' : ''
-                                }`}
-                            >
-                                {subTask}
-                            </label>
-                            {studyTime && <p className="text-xs text-primary/80 mt-1">{studyTime}</p>}
-                        </div>
-                    </div>
-                    {!subTaskData?.completed && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={() => onOpenTimer(selectedDay, index, subTask, subTaskData?.studyLogs || [])}>
-                            <Timer className="w-4 h-4 text-primary" />
-                        </Button>
-                    )}
+    const renderContent = () => {
+        if (!roadmap) {
+            return <p className="text-muted-foreground">No active roadmap.</p>;
+        }
+        if (!roadmap.startDate) {
+            return (
+                <div className="flex flex-col items-start gap-4">
+                    <p className="text-muted-foreground">Set a start date for your roadmap to begin.</p>
+                    <DatePicker date={newStartDate} setDate={setNewStartDate} />
+                    <Button onClick={() => newStartDate && onSetStartDate(newStartDate)} disabled={!newStartDate}>
+                        Start Roadmap
+                    </Button>
                 </div>
-            )})}
-          </div>
-        ) : (
-          <div className="flex items-center space-x-3 text-muted-foreground">
-            <CheckCircle className="w-5 h-5 text-green-500" />
-            <p>No tasks scheduled for this day.</p>
-          </div>
-        )}
-      </Card>
-  );
+            );
+        }
+        // This is the new logic
+        if (isRoadmapFuture && selectedDay === currentDay) {
+            return (
+                <div className="text-center py-8">
+                    <p className="font-semibold">Your roadmap is scheduled to begin on:</p>
+                    <p className="text-lg text-primary">{format(new Date(roadmap.startDate), 'PPP')}</p>
+                </div>
+            );
+        }
+        if (!taskForSelectedDay) {
+            return <p className="text-muted-foreground">No tasks for this day.</p>;
+        }
+
+        return (
+             <div className="space-y-4">
+                <ul className="space-y-3">
+                    {subTasks.map((sub, index) => (
+                        <li key={index} className="flex items-center gap-3">
+                            <Checkbox
+                                id={`subtask-${index}`}
+                                checked={sub.completed}
+                                onCheckedChange={() => handleToggleSubTask(index)}
+                                disabled={selectedDay > currentDay && !sub.completed}
+                            />
+                            <label
+                                htmlFor={`subtask-${index}`}
+                                className={`flex-grow ${sub.completed ? 'line-through text-muted-foreground' : ''}`}
+                            >
+                                {sub.text}
+                            </label>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onOpenTimer(selectedDay, index, sub.text, sub.studyLogs || [])}>
+                                <Clock className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setRelocatingTask({taskIndex: index, destDay: selectedDay})}>
+                                <Move className="h-4 w-4" />
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    };
+
+    return (
+        <>
+            <Card className="neon-border bg-card/90 backdrop-blur-sm">
+                <CardHeader>
+                    <CardTitle>
+                        {`Day ${selectedDay}`}
+                        {selectedDay === currentDay && !isRoadmapFuture && <Badge className="ml-2">Today</Badge>}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {renderContent()}
+                </CardContent>
+            </Card>
+            {relocatingTask && roadmap && (
+                <Dialog open={!!relocatingTask} onOpenChange={() => setRelocatingTask(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Relocate Task</DialogTitle>
+                            <DialogDescription>
+                                Choose a new day to move this task to.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Select
+                                onValueChange={(value) => setRelocatingTask({...relocatingTask, destDay: parseInt(value)})}
+                                defaultValue={String(relocatingTask.destDay)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a day" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {roadmap.dailyTasks.map(task => (
+                                        <SelectItem key={task.day} value={String(task.day)}>
+                                            Day {task.day}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setRelocatingTask(null)}>Cancel</Button>
+                            <Button onClick={handleConfirmRelocation}>Confirm</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </>
+    );
 };

@@ -1,116 +1,101 @@
 // src/components/Roadmap.tsx
-
-import React, { useEffect, useRef } from 'react';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { CheckCircle, AlertTriangle, Radio } from 'lucide-react';
-import { format, isValid } from 'date-fns';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { DatePicker } from './ui/date-picker';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import { format } from 'date-fns';
 
 interface RoadmapProps {
-  roadmap: any | null;
-  selectedDay: number;
-  onSelectDay: (day: number) => void;
-  currentDay: number;
+    roadmap: any;
+    selectedDay: number;
+    onSelectDay: (day: number) => void;
+    currentDay: number;
+    onShift: (newStartDate: Date) => void;
 }
 
-const difficultyColors = {
-  Easy: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  Medium: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-  Hard: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  Challenge: 'bg-red-500/20 text-red-300 border-red-500/30',
-};
+export const Roadmap: React.FC<RoadmapProps> = ({ roadmap, selectedDay, onSelectDay, currentDay, onShift }) => {
+    const [newStartDate, setNewStartDate] = React.useState<Date | undefined>();
+    const [isShifting, setIsShifting] = React.useState(false);
+    
+    const handleConfirmShift = () => {
+        if (newStartDate) {
+            onShift(newStartDate);
+            setIsShifting(false);
+        }
+    };
 
-export const Roadmap = ({ roadmap, selectedDay, onSelectDay, currentDay }: RoadmapProps) => {
-  const scrollViewportRef = useRef<HTMLDivElement>(null);
-  const currentDayRef = useRef<HTMLLIElement>(null);
-  const hasAutoScrolled = useRef(false);
-
-  useEffect(() => {
-    if (roadmap && currentDayRef.current && scrollViewportRef.current && !hasAutoScrolled.current) {
-      const viewport = scrollViewportRef.current;
-      const element = currentDayRef.current;
-      const topPos = element.offsetTop - viewport.offsetTop;
-
-      setTimeout(() => {
-        viewport.scrollTo({ top: topPos, behavior: 'smooth' });
-        hasAutoScrolled.current = true;
-      }, 100);
+    const getDateForDay = (day: number): Date | null => {
+        if (!roadmap?.startDate) return null;
+        const date = new Date(roadmap.startDate);
+        date.setDate(date.getDate() + day - 1);
+        return date;
     }
-  }, [roadmap]);
 
-  if (!roadmap || !roadmap.dailyTasks || roadmap.dailyTasks.length === 0) {
     return (
-      <Card className="p-4 neon-border bg-card/90 backdrop-blur-sm animate-fade-in-up">
-        <h3 className="text-lg font-bold mb-4">Full Roadmap</h3>
-        <p className="text-muted-foreground text-sm p-4 text-center">Generate a roadmap to see your full plan.</p>
-      </Card>
+        <Card className="neon-border bg-card/90 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Roadmap Overview</CardTitle>
+                {roadmap && (
+                    isShifting ? (
+                        <div className="flex items-center gap-2">
+                            <DatePicker date={newStartDate} setDate={setNewStartDate} />
+                            <Button onClick={handleConfirmShift} size="sm" disabled={!newStartDate}>Confirm</Button>
+                            <Button variant="ghost" size="sm" onClick={() => setIsShifting(false)}>Cancel</Button>
+                        </div>
+                    ) : (
+                        <Button variant="outline" size="sm" onClick={() => setIsShifting(true)}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            Shift Dates
+                        </Button>
+                    )
+                )}
+            </CardHeader>
+            <CardContent>
+                {roadmap?.dailyTasks ? (
+                    <div className="grid grid-cols-7 md:grid-cols-10 lg:grid-cols-15 gap-2">
+                        {roadmap.dailyTasks.map((task: any) => {
+                            const taskDate = getDateForDay(task.day);
+                            return (
+                                <Popover key={task.day}>
+                                    <PopoverTrigger asChild>
+                                        <button
+                                            onClick={() => onSelectDay(task.day)}
+                                            className={cn(
+                                                "p-2 text-xs rounded-md flex flex-col items-center justify-center font-bold aspect-square transition-all",
+                                                task.day === selectedDay ? "bg-primary text-primary-foreground ring-2 ring-accent" : "bg-muted hover:bg-muted/80",
+                                                task.day < currentDay && !task.completed ? "bg-red-500/30 text-red-100" : "",
+                                                task.day < currentDay && task.completed ? "bg-green-500/30 text-green-100" : "",
+                                                task.day === currentDay && "animate-pulse"
+                                            )}
+                                        >
+                                            <span className="text-lg">{task.day}</span>
+                                            {taskDate && <span className="text-muted-foreground text-[10px]">{format(taskDate, 'MMM d')}</span>}
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent>
+                                        <div className="space-y-2">
+                                            <p className="font-bold">Day {task.day} - {taskDate && format(taskDate, 'PPP')}</p>
+                                             <p className="text-sm font-semibold text-primary">{task.difficulty}</p>
+                                            <ul className="list-disc list-inside text-sm">
+                                                {task.task.split(';').map((t:string, i:number) => <li key={i}>{t.trim()}</li>)}
+                                            </ul>
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <p className="text-muted-foreground">Generate a roadmap to see your timeline.</p>
+                )}
+            </CardContent>
+        </Card>
     );
-  }
-  
-  const startDate = roadmap.startDate instanceof Date ? roadmap.startDate : new Date();
-  if (!isValid(startDate)) {
-      console.error("Roadmap received an invalid startDate.");
-      return <div>Error: Invalid roadmap start date.</div>
-  }
-
-
-  return (
-    <Card className="p-4 md:p-6 neon-border bg-card/90 backdrop-blur-sm animate-fade-in-up">
-      <h3 className="text-2xl font-bold mb-6 text-center gradient-text">Your Mission Blueprint</h3>
-      <ScrollArea className="h-[400px] lg:h-[500px]" viewportRef={scrollViewportRef} scrollbarClassName="invisible">
-        <div className="relative pl-6">
-          <div className="absolute left-0 top-0 h-full w-0.5 bg-border/50" />
-          <ul className="space-y-8">
-            {roadmap.dailyTasks.map((task: any, index: number) => {
-              const taskDate = new Date(startDate);
-              if (isValid(taskDate)) {
-                  taskDate.setDate(startDate.getDate() + (task.day - 1));
-              }
-              const isSelected = selectedDay === task.day;
-              
-              const formattedDate = isValid(taskDate) ? format(taskDate, 'MMMM d') : 'Date Error';
-
-              return (
-                <li
-                  key={`${task.day}-${index}`} 
-                  ref={task.day === currentDay ? currentDayRef : null}
-                  className="relative pl-6 cursor-pointer group"
-                  onClick={() => onSelectDay(task.day)}
-                >
-                  <div className={`absolute -left-2.5 top-1 w-5 h-5 rounded-full border-4 transition-colors ${isSelected ? 'border-primary bg-primary/50' : 'border-card bg-border group-hover:bg-primary/50'}`} />
-                  <div className="transition-transform duration-300 group-hover:translate-x-2">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-5 flex-shrink-0">
-                        {task.completed && (
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                        )}
-                      </div>
-                      <div className="flex items-baseline space-x-3 flex-grow">
-                        <strong className="text-primary text-lg">Day {task.day}</strong>
-                        <span className="text-sm font-semibold text-muted-foreground">{formattedDate}</span>
-                        <div className="flex-grow" />
-                        {task.day < currentDay && !task.completed && (
-                            <AlertTriangle className="w-5 h-5 text-red-500 animate-pulse" />
-                        )}
-                        {task.day === currentDay && !task.completed && (
-                            <Radio className="w-5 h-5 text-primary animate-pulse" />
-                        )}
-                      </div>
-                    </div>
-                    <p className="mt-1 text-base text-foreground/80 pl-7">{task.task}</p>
-                    <div className="mt-2 text-left pl-7">
-                        <Badge variant="outline" className={`text-xs ${difficultyColors[task.difficulty as keyof typeof difficultyColors] || difficultyColors.Medium}`}>
-                          {task.difficulty}
-                        </Badge>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </ScrollArea>
-    </Card>
-  );
 };

@@ -1,8 +1,10 @@
+// src/pages/Index.tsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { MotivationalQuote } from '@/components/MotivationalQuote';
-import { TaskManager, Task } from '@/components/TaskManager';
+import TaskManager, { Task } from '@/components/TaskManager';
 import AIPlanner from '@/components/AIPlanner';
 import { AIAssistant } from '@/components/AIAssistant';
 import { DailyTaskCard } from '@/components/DailyTaskCard';
@@ -32,8 +34,8 @@ const Index = () => {
     const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
     const [roadmap, setRoadmap] = useState<any | null>(null);
+    const [loading, setLoading] = useState(true);
     const [selectedDay, setSelectedDay] = useState<number>(1);
     const [currentDay, setCurrentDay] = useState<number>(1);
     const [hasIncompleteTasks, setHasIncompleteTasks] = useState(false);
@@ -48,6 +50,8 @@ const Index = () => {
     const initialCheckDone = useRef(false);
     const [proposedRoadmap, setProposedRoadmap] = useState<any | null>(null);
 
+    // ... (All the useEffect and achievement logic remains the same)
+    
     useEffect(() => {
         sessionSecondsRef.current = sessionSeconds;
     }, [sessionSeconds]);
@@ -92,7 +96,7 @@ const Index = () => {
         if (currentStats.completedMissions >= 5) addAchievement('mission_5');
         if (currentStats.completedMissions >= 10) addAchievement('mission_10');
         if (currentStats.completedMissions >= 25) addAchievement('mission_25');
-        if (currentStats.archivedTasks?.some((t: Task) => t.priority === 'extreme')) addAchievement('extreme_1');
+        if (currentStats.archivedTasks?.some((t: any) => t.priority === 'extreme')) addAchievement('extreme_1');
         if (currentStats.streak >= 3) addAchievement('streak_3');
         if (currentStats.streak >= 7) addAchievement('streak_7');
         if (currentStats.streak >= 30) addAchievement('streak_30');
@@ -176,7 +180,59 @@ const Index = () => {
         if (!user) return;
         setRoadmap(newRoadmap);
         const roadmapDocRef = doc(db, 'users', user.uid, 'data', 'roadmap');
-        setDoc(roadmapDocRef, newRoadmap, { merge: true });
+        const roadmapForFirebase = {
+            ...newRoadmap,
+            startDate: newRoadmap.startDate ? newRoadmap.startDate : null,
+        };
+        setDoc(roadmapDocRef, roadmapForFirebase, { merge: true });
+    };
+    
+    const handleSetRoadmapStartDate = (date: Date) => {
+        if (!roadmap) return;
+        const newRoadmap = { ...roadmap, startDate: date };
+        handleRoadmapUpdate(newRoadmap);
+        toast.success("Roadmap started! Your first day is set.");
+    };
+
+    const handleShiftRoadmap = (newStartDate: Date) => {
+        if (!roadmap) return;
+        const newRoadmap = { ...roadmap, startDate: newStartDate };
+        handleRoadmapUpdate(newRoadmap);
+        toast.success("Roadmap dates have been shifted.");
+    };
+
+    const handleRelocateSubTask = (sourceDay: number, taskIndex: number, destinationDay: number) => {
+        if (!roadmap || sourceDay === destinationDay) return;
+
+        const updatedDailyTasks = JSON.parse(JSON.stringify(roadmap.dailyTasks));
+
+        const sourceTask = updatedDailyTasks.find((t:any) => t.day === sourceDay);
+        const destTask = updatedDailyTasks.find((t:any) => t.day === destinationDay);
+
+        if (!sourceTask || !destTask) return;
+        
+        // Ensure subtasks are initialized
+        if (!sourceTask.subTasks || sourceTask.subTasks.length === 0) {
+            sourceTask.subTasks = sourceTask.task.split(';').map((t: string) => ({text: t.trim(), completed: false}));
+        }
+        if (!destTask.subTasks || destTask.subTasks.length === 0) {
+            destTask.subTasks = destTask.task.split(';').map((t: string) => ({text: t.trim(), completed: false}));
+        }
+
+        const [relocatedTask] = sourceTask.subTasks.splice(taskIndex, 1);
+        destTask.subTasks.push(relocatedTask);
+
+        // Rebuild the task string from subtasks
+        sourceTask.task = sourceTask.subTasks.map((t:any) => t.text).join('; ');
+        destTask.task = destTask.subTasks.map((t:any) => t.text).join('; ');
+
+        // If source day is now empty, mark it as complete
+        if(sourceTask.subTasks.length === 0){
+            sourceTask.completed = true;
+        }
+
+        handleRoadmapUpdate({ ...roadmap, dailyTasks: updatedDailyTasks });
+        toast.success(`Task relocated from Day ${sourceDay} to Day ${destinationDay}.`);
     };
 
     const updateTasksAndStatsAtomically = async (day: number, subTaskIndex: number, newLog?: StudyLog, deleteLogId?: string, editLog?: {id: string, duration: number}) => {
@@ -313,7 +369,11 @@ const Index = () => {
         if (roadmap?.dailyTasks && roadmap.startDate) {
             const day = calculateCurrentDay(roadmap.startDate);
             setCurrentDay(day);
-            setSelectedDay(day); 
+            if(selectedDay < day) {
+                // don't change selected day if it's in the past
+            } else {
+                 setSelectedDay(day);
+            }
             const incomplete = roadmap.dailyTasks.some((task: any) => task.day < day && !task.completed);
             setHasIncompleteTasks(incomplete);
             const allComplete = roadmap.dailyTasks.every((task: any) => task.completed);
@@ -714,6 +774,8 @@ const Index = () => {
                             onRoadmapUpdate={handleDailyTaskUpdate} 
                             currentDay={currentDay} 
                             onOpenTimer={handleOpenTimer}
+                            onSetStartDate={handleSetRoadmapStartDate}
+                            onRelocateTask={handleRelocateSubTask}
                         />
                         <DashboardStats stats={stats} unlockedAchievements={unlockedAchievements} />
                         <MoodTracker onMoodLog={() => handleStatEvent('mood_logged')} />
@@ -725,7 +787,7 @@ const Index = () => {
                 </div>
 
                 <div className="mt-8 lg:mt-12">
-                    <Roadmap roadmap={roadmap} selectedDay={selectedDay} onSelectDay={setSelectedDay} currentDay={currentDay} />
+                    <Roadmap roadmap={roadmap} selectedDay={selectedDay} onSelectDay={setSelectedDay} currentDay={currentDay} onShift={handleShiftRoadmap}/>
                 </div>
                 <AIAssistant
                     currentRoadmap={roadmap}
@@ -767,4 +829,4 @@ const Index = () => {
     );
 };
 
-export default Index;
+export default Index; 
