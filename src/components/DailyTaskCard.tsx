@@ -1,5 +1,3 @@
-// src/components/DailyTaskCard.tsx
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { format } from 'date-fns';
 
 
-// We need to define the types here as they are not in a central file
 export interface StudyLog {
     id: string;
     duration: number;
@@ -125,7 +122,6 @@ export const DailyTaskCard: React.FC<DailyTaskCardProps> = ({
                 </div>
             );
         }
-        // This is the new logic
         if (isRoadmapFuture && selectedDay === currentDay) {
             return (
                 <div className="text-center py-8">
