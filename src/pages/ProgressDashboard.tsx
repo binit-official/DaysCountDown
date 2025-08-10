@@ -34,7 +34,8 @@ const ProgressDashboard = () => {
 
     // Journal/Mood Data Fetching
     const journalCollectionRef = collection(db, 'users', user.uid, 'journal');
-    const journalQuery = query(journalCollectionRef, where(documentId(), '>=', format(monthlyStartDate, 'yyyy-MM-dd')));
+    // FIX: Query all journal docs from monthlyStartDate to today (inclusive)
+    const journalQuery = query(journalCollectionRef, where(documentId(), '>=', format(monthlyStartDate, 'yyyy-MM-dd')), where(documentId(), '<=', format(now, 'yyyy-MM-dd')));
     
     const unsubscribeMood = onSnapshot(journalQuery, (querySnapshot) => {
         const dailyCounts: { [key: string]: number } = {};
@@ -43,17 +44,22 @@ const ProgressDashboard = () => {
 
         querySnapshot.forEach(doc => {
             const dayData = doc.data();
+            // FIX: Use the documentId (date string) to check if it's today
+            const docDateStr = doc.id;
+            const docDate = new Date(docDateStr);
+
             if (dayData.moods && Array.isArray(dayData.moods)) {
                 dayData.moods.forEach((moodEntry: any) => {
                     const mood = moodEntry.mood;
-                    const timestamp = moodEntry.timestamp.toDate();
+                    const timestamp = moodEntry.timestamp?.toDate ? moodEntry.timestamp.toDate() : new Date(moodEntry.timestamp);
 
                     monthlyCounts[mood] = (monthlyCounts[mood] || 0) + 1;
                     
                     if (isWithinInterval(timestamp, { start: weeklyStartDate, end: now })) {
                         weeklyCounts[mood] = (weeklyCounts[mood] || 0) + 1;
                     }
-                    if (isToday(timestamp)) {
+                    // FIX: Use either timestamp or docDate for today check
+                    if (isToday(timestamp) || format(now, 'yyyy-MM-dd') === docDateStr) {
                         dailyCounts[mood] = (dailyCounts[mood] || 0) + 1;
                     }
                 });

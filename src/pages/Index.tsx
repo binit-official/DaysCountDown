@@ -25,6 +25,8 @@ import { StudyTimer, StudyLog } from '@/components/StudyTimer';
 import { ALL_ACHIEVEMENTS } from '@/components/Achievements';
 import { fetchWithFallback } from '@/lib/utils';
 import { RoadmapPreview } from '@/components/RoadmapPreview';
+import { StickyNotes } from '@/components/StickyNotes';
+import { AIBubble } from '@/components/AIBubble'; // NEW IMPORT
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_API_KEY_2 = import.meta.env.VITE_GEMINI_API_KEY_2;
@@ -433,6 +435,18 @@ const Index = () => {
         const unsubscribeMoods = onSnapshot(moodDocRef, (docSnap) => {
             if(docSnap.exists()) setMoodAndFeelingData(docSnap.data());
         });
+        // FIX: Also fetch today's journal doc for latest moods/feelings
+        const todayDateString = (new Date()).toISOString().slice(0,10);
+        const todayJournalDocRef = doc(db, 'users', user.uid, 'journal', todayDateString);
+        const unsubscribeTodayJournal = onSnapshot(todayJournalDocRef, (docSnap) => {
+            if(docSnap.exists()) {
+                setMoodAndFeelingData((prev: any) => ({
+                    ...prev,
+                    moods: docSnap.data().moods || prev?.moods || [],
+                    feelings: docSnap.data().feelings || prev?.feelings || [],
+                }));
+            }
+        });
 
         return () => {
             unsubscribeTasks();
@@ -440,6 +454,7 @@ const Index = () => {
             unsubscribeStats();
             unsubscribeJournal();
             unsubscribeMoods();
+            unsubscribeTodayJournal();
         };
     }, [user]);
 
@@ -777,30 +792,13 @@ const Index = () => {
             </main>
 
             <Footer />
-
-            {activeTimerDetails && (
-                 <StudyTimer
-                    taskText={activeTimerDetails.taskText}
-                    elapsedSeconds={sessionSeconds}
-                    totalLoggedTime={activeTimerDetails.logs.reduce((acc, log) => acc + log.duration, 0)}
-                    isActive={timerIsActive}
-                    setIsActive={setTimerIsActive}
-                    studyLogs={activeTimerDetails.logs}
-                    onSaveSession={handleSaveSession}
-                    onEditLog={handleEditStudyLog}
-                    onDeleteLog={handleDeleteStudyLog}
-                    onClose={handleCloseTimer}
-                 />
-            )}
-
-            {proposedRoadmap && (
-                <RoadmapPreview
-                    proposedRoadmap={proposedRoadmap}
-                    onCancel={() => setProposedRoadmap(null)}
-                    onApprove={handleApproveChanges}
-                    currentDay={currentDay}
-                />
-            )}
+            <StickyNotes />
+            <AIBubble
+                isNyxOpen={isNyxAssistantOpen}
+                setNyxOpen={setIsNyxAssistantOpen}
+                isSallyOpen={isGuidingOpen}
+                setSallyOpen={setIsGuidingOpen}
+            />
         </div>
     );
 };

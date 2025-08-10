@@ -44,18 +44,18 @@ export const MoodTracker = ({ onMoodLog }: MoodTrackerProps) => {
         if (docSnap.exists() && docSnap.data().moods?.length > 0) {
             // Find the most recent mood entry
             const lastMood = docSnap.data().moods.reduce((latest: any, current: any) => {
-                return latest.timestamp.toDate() > current.timestamp.toDate() ? latest : current;
+                // FIX: Support both Timestamp and Date
+                const latestTime = latest.timestamp?.toDate ? latest.timestamp.toDate() : new Date(latest.timestamp);
+                const currentTime = current.timestamp?.toDate ? current.timestamp.toDate() : new Date(current.timestamp);
+                return latestTime > currentTime ? latest : current;
             });
-            lastLogTime = lastMood.timestamp.toDate();
+            lastLogTime = lastMood.timestamp?.toDate ? lastMood.timestamp.toDate() : new Date(lastMood.timestamp);
         }
         
         if (lastLogTime) {
             const hoursSinceLastLog = (new Date().getTime() - lastLogTime.getTime()) / (1000 * 60 * 60);
-            if (hoursSinceLastLog > 5) {
-                setShowPrompt(true);
-            }
+            setShowPrompt(hoursSinceLastLog > 5);
         } else {
-            // If no moods logged today, show the prompt
             setShowPrompt(true);
         }
     });

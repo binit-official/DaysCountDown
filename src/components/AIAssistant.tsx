@@ -119,21 +119,13 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
 
     return (
         <>
-            {!isOtherAssistantOpen && (
-                <div className="fixed bottom-4 right-4 z-50">
-                    <Button onClick={() => onOpenChange(!isOpen)} size="icon" className="rounded-full w-16 h-16 shadow-lg shadow-primary/30">
-                        <Bot className="h-8 w-8" />
-                    </Button>
-                </div>
-            )}
-
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 20 }}
-                        className="fixed bottom-24 right-4 z-[60]"
+                        className="fixed bottom-24 left-4 z-[60]" // CHANGED: left-4 for same side
                     >
                         <Card className="w-96 neon-border bg-background/80 backdrop-blur-md">
                             <CardHeader className="flex flex-row items-center justify-between">

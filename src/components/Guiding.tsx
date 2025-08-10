@@ -47,7 +47,15 @@ export const Guiding: React.FC<SallyProps> = ({ isOpen, onOpenChange, isOtherAss
             - Current Streak: ${stats?.streak || 0} days.
             - Recent Journal Entries (last 3): ${journal.slice(-3).map(j => `On ${j.date}: "${j.entry}"`).join('\n') || 'None logged.'}
             - Recent Moods Logged (last 5): ${moods?.moods?.slice(-5).map((m: any) => m.mood).join(', ') || 'None logged.'}
-            - Recent Feelings Logged (last 5): ${moods?.feelings?.slice(-5).map((f: any) => f.feeling).join(', ') || 'None logged.'}
+            - Today's Moods: ${moods?.moods?.filter((m: any) => {
+                const t = m.timestamp?.toDate ? m.timestamp.toDate() : new Date(m.timestamp);
+                return t && t.toDateString() === new Date().toDateString();
+            }).map((m: any) => m.mood).join(', ') || 'None logged.'}
+            - Recent Feelings Logged (last 5): ${moods?.feelings?.slice(-5).map((f: any) => f.feeling || f.text).join(', ') || 'None logged.'}
+            - Today's Feelings: ${moods?.feelings?.filter((f: any) => {
+                const t = f.timestamp?.toDate ? f.timestamp.toDate() : new Date(f.timestamp);
+                return t && t.toDateString() === new Date().toDateString();
+            }).map((f: any) => f.feeling || f.text).join(', ') || 'None logged.'}
 
             PREVIOUS CONVERSATION HISTORY WITH YOU (SALLY):
             ${messages.map(m => `${m.role}: ${m.text}`).join('\n')}
@@ -95,21 +103,13 @@ export const Guiding: React.FC<SallyProps> = ({ isOpen, onOpenChange, isOtherAss
 
     return (
         <>
-            {!isOtherAssistantOpen && (
-                 <div className="fixed bottom-4 left-4 z-50">
-                    <Button onClick={() => onOpenChange(true)} size="icon" className="rounded-full w-16 h-16 shadow-lg shadow-secondary/30 bg-secondary hover:bg-secondary/90">
-                        <Sparkles className="h-8 w-8" />
-                    </Button>
-                </div>
-            )}
-           
             <AnimatePresence>
                 {isOpen && (
                      <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 20 }}
-                        className="fixed bottom-24 left-4 z-[60]"
+                        className="fixed bottom-24 left-4 z-[60]" // CHANGED: left-4 for same side
                     >
                         <Card className="w-96 neon-border-secondary bg-background/80 backdrop-blur-md">
                             <CardHeader className="flex flex-row items-center justify-between">
