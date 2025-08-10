@@ -5,6 +5,7 @@ import { Achievements } from '@/components/Achievements';
 interface DashboardStatsProps {
   stats: {
     streak: number;
+    maxStreak: number;
     completedMissions: number;
   };
   unlockedAchievements: string[];
@@ -21,6 +22,10 @@ export const DashboardStats = ({ stats, unlockedAchievements }: DashboardStatsPr
           <div className="p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">Current Streak</p>
             <p className="text-3xl font-bold">{stats.streak} Days</p>
+          </div>
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">Max Streak</p>
+            <p className="text-3xl font-bold">{stats.maxStreak} Days</p>
           </div>
           <div className="p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">Missions Completed</p>

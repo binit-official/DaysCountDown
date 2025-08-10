@@ -422,7 +422,7 @@ const Index = () => {
                 }
                 setStats(data);
             } else {
-                setDoc(statsDocRef, { streak: 0, completedMissions: 0, totalStudyTime: 0, unlockedAchievements: [] });
+                setDoc(statsDocRef, { streak: 0, maxStreak: 0, completedMissions: 0, totalStudyTime: 0, unlockedAchievements: [] });
             }
         });
 
@@ -477,12 +477,30 @@ const Index = () => {
 
             const currentStats = statsDoc.data();
             const lastCompletedDate = currentStats.lastCompleted?.toDate();
-            if (lastCompletedDate && isToday(lastCompletedDate)) return;
+            const today = startOfDay(new Date());
+            const lastCompletedDay = lastCompletedDate ? startOfDay(lastCompletedDate) : null;
+            let newStreak = 1;
+            if (lastCompletedDay) {
+                const diffDays = Math.floor((today.getTime() - lastCompletedDay.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays === 1) {
+                    newStreak = (currentStats.streak || 0) + 1;
+                } else if (diffDays === 0) {
+                    newStreak = currentStats.streak || 1;
+                } else {
+                    newStreak = 1;
+                }
+            }
+            // FIX: Only update maxStreak if streak is increased AND it's the end of the day
+            // Do NOT update maxStreak instantly when streak increases
+            let newMaxStreak = currentStats.maxStreak || 0;
+            // Only update maxStreak if streak is increased AND it's the end of the day AND today is after lastCompletedDay
+            const isEndOfDay = new Date().getHours() >= 23; // You can adjust this threshold as needed
+            if (isEndOfDay && newStreak > newMaxStreak && lastCompletedDay && today > lastCompletedDay) {
+                newMaxStreak = newStreak;
+            }
 
-            const newStreak = (lastCompletedDate && isYesterday(lastCompletedDate)) ? (currentStats.streak || 0) + 1 : 1;
-            
-            transaction.update(statsDocRef, { streak: newStreak, lastCompleted: new Date() });
-            
+            transaction.update(statsDocRef, { streak: newStreak, maxStreak: newMaxStreak, lastCompleted: today });
+
             await updateAchievements(roadmap, { ...currentStats, streak: newStreak });
             toast.success(`🔥 Streak extended to ${newStreak} days!`);
         });
@@ -494,20 +512,19 @@ const Index = () => {
             const statsDocRef = doc(db, 'users', user.uid, 'data', 'stats');
             const statsDoc = await transaction.get(statsDocRef);
             if (!statsDoc.exists()) return;
-            
+
             const currentStats = statsDoc.data();
             const lastCompletedDate = currentStats.lastCompleted?.toDate();
 
             if (lastCompletedDate && isToday(lastCompletedDate)) {
-                const yesterday = new Date();
+                const yesterday = startOfDay(new Date());
                 yesterday.setDate(yesterday.getDate() - 1);
                 const newStreak = (currentStats.streak || 1) - 1;
-                
                 transaction.update(statsDocRef, {
-                    streak: newStreak,
-                    lastCompleted: currentStats.streak > 1 ? startOfDay(yesterday) : null
+                    streak: newStreak > 0 ? newStreak : 0,
+                    lastCompleted: newStreak > 0 ? yesterday : null
                 });
-                
+
                 await updateAchievements(roadmap, { ...currentStats, streak: newStreak });
                 toast.info("Streak reverted for today.");
             }
