@@ -52,6 +52,10 @@ interface DailyTaskCardProps {
     onOpenTimer: (day: number, subTaskIndex: number, taskText: string, logs: StudyLog[]) => void;
     onSetStartDate: (date: Date) => void;
     onRelocateTask: (sourceDay: number, taskIndex: number, destinationDay: number) => void;
+    onMarkBreakDay?: (day: number) => void;
+    onRemoveBreakDay?: (day: number) => void;
+    onDeleteDay?: (day: number) => void;
+    breakDays?: number[];
 }
 
 export const DailyTaskCard: React.FC<DailyTaskCardProps> = ({
@@ -62,12 +66,17 @@ export const DailyTaskCard: React.FC<DailyTaskCardProps> = ({
     onOpenTimer,
     onSetStartDate,
     onRelocateTask,
+    onMarkBreakDay,
+    onRemoveBreakDay,
+    onDeleteDay,
+    breakDays = [],
 }) => {
     const [newStartDate, setNewStartDate] = React.useState<Date | undefined>();
     const [relocatingTask, setRelocatingTask] = React.useState<{taskIndex: number, destDay: number} | null>(null);
 
     const taskForSelectedDay = roadmap?.dailyTasks.find(t => t.day === selectedDay);
     const isRoadmapFuture = roadmap?.startDate && new Date(roadmap.startDate) > new Date();
+    const isBreakDay = breakDays.includes(selectedDay);
 
     const handleToggleSubTask = (subTaskIndex: number) => {
         if (!roadmap || !taskForSelectedDay) return;
@@ -174,6 +183,37 @@ export const DailyTaskCard: React.FC<DailyTaskCardProps> = ({
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-bold">
+                      Day {selectedDay} Tasks
+                    </h3>
+                    {/* Mark/Remove Break Day button */}
+                    {typeof onMarkBreakDay === "function" && !isBreakDay && (
+                      <button
+                        className="px-3 py-1 rounded bg-yellow-400 text-yellow-900 font-semibold shadow hover:bg-yellow-500 transition"
+                        onClick={() => onMarkBreakDay(selectedDay)}
+                      >
+                        Mark as Break Day
+                      </button>
+                    )}
+                    {typeof onRemoveBreakDay === "function" && isBreakDay && (
+                      <button
+                        className="px-3 py-1 rounded bg-yellow-100 text-yellow-700 font-semibold shadow hover:bg-yellow-200 transition"
+                        onClick={() => onRemoveBreakDay(selectedDay)}
+                      >
+                        Remove Break Day
+                      </button>
+                    )}
+                    {/* Add Delete Day button */}
+                    {typeof onDeleteDay === "function" && (
+                      <button
+                        className="px-3 py-1 rounded bg-red-500 text-white font-semibold shadow hover:bg-red-600 transition ml-2"
+                        onClick={() => onDeleteDay(selectedDay)}
+                      >
+                        Delete Day
+                      </button>
+                    )}
+                  </div>
                     {renderContent()}
                 </CardContent>
             </Card>

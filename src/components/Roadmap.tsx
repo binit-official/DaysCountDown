@@ -62,6 +62,8 @@ export const Roadmap: React.FC<RoadmapProps> = ({ roadmap, selectedDay, onSelect
                     <div className="grid grid-cols-7 md:grid-cols-10 lg:grid-cols-15 gap-2">
                         {roadmap.dailyTasks.map((task: any) => {
                             const taskDate = getDateForDay(task.day);
+                            // FIX: Detect break day for coloring
+                            const isBreakDay = !!task.isBreak || (task.task === "Break Day");
                             return (
                                 <Popover key={task.day}>
                                     <PopoverTrigger asChild>
@@ -70,19 +72,27 @@ export const Roadmap: React.FC<RoadmapProps> = ({ roadmap, selectedDay, onSelect
                                             className={cn(
                                                 "p-2 text-xs rounded-md flex flex-col items-center justify-center font-bold aspect-square transition-all",
                                                 task.day === selectedDay ? "bg-primary text-primary-foreground ring-2 ring-accent" : "bg-muted hover:bg-muted/80",
-                                                task.day < currentDay && !task.completed ? "bg-red-500/30 text-red-100" : "",
-                                                task.day < currentDay && task.completed ? "bg-green-500/30 text-green-100" : "",
+                                                isBreakDay
+                                                    ? "bg-yellow-400/60 text-yellow-900" // Highlight break days
+                                                    : task.day < currentDay && !task.completed
+                                                        ? "bg-red-500/30 text-red-100"
+                                                        : task.day < currentDay && task.completed
+                                                            ? "bg-green-500/30 text-green-100"
+                                                            : "",
                                                 task.day === currentDay && "animate-pulse"
                                             )}
                                         >
                                             <span className="text-lg">{task.day}</span>
                                             {taskDate && <span className="text-muted-foreground text-[10px]">{format(taskDate, 'MMM d')}</span>}
+                                            {isBreakDay && (
+                                                <span className="text-[10px] font-bold text-yellow-900 mt-1">Break</span>
+                                            )}
                                         </button>
                                     </PopoverTrigger>
                                     <PopoverContent>
                                         <div className="space-y-2">
                                             <p className="font-bold">Day {task.day} - {taskDate && format(taskDate, 'PPP')}</p>
-                                             <p className="text-sm font-semibold text-primary">{task.difficulty}</p>
+                                            <p className="text-sm font-semibold text-primary">{task.difficulty}</p>
                                             <ul className="list-disc list-inside text-sm">
                                                 {task.task.split(';').map((t:string, i:number) => <li key={i}>{t.trim()}</li>)}
                                             </ul>

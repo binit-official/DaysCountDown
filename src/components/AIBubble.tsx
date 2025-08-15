@@ -36,10 +36,13 @@ export const AIBubble: React.FC<AIBubbleProps> = ({
   const parentBubbleClass =
     "bg-gradient-to-br from-primary to-secondary border-2 border-white shadow-lg rounded-full w-16 h-16 flex items-center justify-center";
 
+  // FIX: Ensure the bubble is always rendered above other content and not hidden by layout
+  // Add pointer-events-auto and a higher z-index if needed
   return (
     <div
       ref={containerRef}
-      className="fixed bottom-4 left-4 z-[100] flex flex-col items-start gap-4"
+      // FIX: Remove inline style, use only Tailwind classes for position and z-index
+      className="fixed bottom-8 left-8 z-[9999] flex flex-col items-start gap-4 pointer-events-auto"
     >
       <AnimatePresence>
         {!expanded && (

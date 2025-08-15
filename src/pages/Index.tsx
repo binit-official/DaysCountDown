@@ -57,6 +57,8 @@ const Index = () => {
     const [isNyxAssistantOpen, setIsNyxAssistantOpen] = useState(false);
     const [isGuidingOpen, setIsGuidingOpen] = useState(false);
 
+    // Optimized break day logic: only shift one day, no extra empty/break days
+    const [breakDays, setBreakDays] = useState<number[]>([]);
 
     useEffect(() => {
         sessionSecondsRef.current = sessionSeconds;
@@ -165,7 +167,7 @@ const Index = () => {
             };
     
             if (eventType === 'roadmap_generated' && data.days >= 30) addAchievement('roadmap_30_days');
-            if (eventType === 'feedback_used') addAchievement('feedback_1');
+            if (eventType === 'feedback_used' ) addAchievement('feedback_1');
             if (eventType === 'journal_saved') {
                 const journalCollectionRef = collection(db, 'users', user.uid, 'journal');
                 const journalSnapshot = await getDocs(journalCollectionRef);
@@ -305,10 +307,40 @@ const Index = () => {
         }
     };
 
+    // FIX: StudyTimer logging bug - ensure logs are appended to the correct subtask and update UI
     const handleSaveSession = () => {
         if (sessionSecondsRef.current > 0 && activeTimerDetails) {
             const { day, subTaskIndex } = activeTimerDetails;
             const newLog: StudyLog = { id: Date.now().toString(), duration: sessionSecondsRef.current, timestamp: new Date() };
+            // Ensure logs are appended to the correct subtask and update UI immediately
+            if (roadmap) {
+                const updatedDailyTasks = roadmap.dailyTasks.map((task: any) => {
+                    if (task.day === day) {
+                        // Ensure subTasks exist
+                        let subTasks = task.subTasks;
+                        if (!subTasks || subTasks.length === 0) {
+                            subTasks = task.task.split(';').map((t: string) => ({
+                                text: t.trim(),
+                                completed: false,
+                                studyLogs: []
+                            }));
+                        }
+                        // Append log to correct subtask
+                        subTasks = subTasks.map((sub: any, idx: number) => {
+                            if (idx === subTaskIndex) {
+                                return {
+                                    ...sub,
+                                    studyLogs: [...(sub.studyLogs || []), newLog]
+                                };
+                            }
+                            return sub;
+                        });
+                        return { ...task, subTasks };
+                    }
+                    return task;
+                });
+                setRoadmap({ ...roadmap, dailyTasks: updatedDailyTasks });
+            }
             updateTasksAndStatsAtomically(day, subTaskIndex, newLog);
             setSessionSeconds(0);
             sessionSecondsRef.current = 0;
@@ -344,12 +376,68 @@ const Index = () => {
     const handleEditStudyLog = (logId: string, newDuration: number) => {
         if (!activeTimerDetails) return;
         const { day, subTaskIndex } = activeTimerDetails;
-        updateTasksAndStatsAtomically(day, subTaskIndex, undefined, undefined, {id: logId, duration: newDuration});
+        // Update UI immediately for edit
+        if (roadmap) {
+            const updatedDailyTasks = roadmap.dailyTasks.map((task: any) => {
+                if (task.day === day) {
+                    let subTasks = task.subTasks;
+                    if (!subTasks || subTasks.length === 0) {
+                        subTasks = task.task.split(';').map((t: string) => ({
+                            text: t.trim(),
+                            completed: false,
+                            studyLogs: []
+                        }));
+                    }
+                    subTasks = subTasks.map((sub: any, idx: number) => {
+                        if (idx === subTaskIndex) {
+                            return {
+                                ...sub,
+                                studyLogs: (sub.studyLogs || []).map((log: StudyLog) =>
+                                    log.id === logId ? { ...log, duration: newDuration } : log
+                                )
+                            };
+                        }
+                        return sub;
+                    });
+                    return { ...task, subTasks };
+                }
+                return task;
+            });
+            setRoadmap({ ...roadmap, dailyTasks: updatedDailyTasks });
+        }
+        updateTasksAndStatsAtomically(day, subTaskIndex, undefined, undefined, { id: logId, duration: newDuration });
     };
 
     const handleDeleteStudyLog = (logId: string) => {
-       if (!activeTimerDetails) return;
+        if (!activeTimerDetails) return;
         const { day, subTaskIndex } = activeTimerDetails;
+        // Update UI immediately for delete
+        if (roadmap) {
+            const updatedDailyTasks = roadmap.dailyTasks.map((task: any) => {
+                if (task.day === day) {
+                    let subTasks = task.subTasks;
+                    if (!subTasks || subTasks.length === 0) {
+                        subTasks = task.task.split(';').map((t: string) => ({
+                            text: t.trim(),
+                            completed: false,
+                            studyLogs: []
+                        }));
+                    }
+                    subTasks = subTasks.map((sub: any, idx: number) => {
+                        if (idx === subTaskIndex) {
+                            return {
+                                ...sub,
+                                studyLogs: (sub.studyLogs || []).filter((log: StudyLog) => log.id !== logId)
+                            };
+                        }
+                        return sub;
+                    });
+                    return { ...task, subTasks };
+                }
+                return task;
+            });
+            setRoadmap({ ...roadmap, dailyTasks: updatedDailyTasks });
+        }
         updateTasksAndStatsAtomically(day, subTaskIndex, undefined, logId);
     };
     
@@ -705,7 +793,72 @@ const Index = () => {
             setProposedRoadmap(null);
         }
     };
-    
+
+    const handleMarkBreakDay = (day: number) => {
+        if (!roadmap || breakDays.includes(day)) return;
+
+        // Find the index for the break day (day numbers start at 1, array at 0)
+        const idx = roadmap.dailyTasks.findIndex((task: any) => task.day === day);
+        if (idx === -1) return;
+
+        // Only insert a break day if the day actually has a task
+        if (!roadmap.dailyTasks[idx].task || roadmap.dailyTasks[idx].task === "Break Day") return;
+
+        // Insert break day at idx, shift only the next task
+        const updatedTasks = roadmap.dailyTasks.map((task: any) => ({ ...task }));
+        updatedTasks.splice(idx, 0, { day, task: "Break Day", difficulty: "Easy", completed: false, isBreak: true });
+
+        // Shift only the next task (if exists)
+        if (updatedTasks[idx + 1] && !updatedTasks[idx + 1].isBreak) {
+            updatedTasks[idx + 1].day = updatedTasks[idx + 1].day + 1;
+        }
+
+        // Re-number all days to be sequential and filter out any tasks with empty task strings (not break days)
+        const renumberedTasks = updatedTasks
+            .map((task: any, i: number) => ({ ...task, day: i + 1 }))
+            .filter((task: any) => task.task && (task.task !== "" || task.isBreak));
+
+        setBreakDays([...breakDays, day]);
+        handleRoadmapUpdate({ ...roadmap, dailyTasks: renumberedTasks, days: renumberedTasks.length });
+        toast.success(`Break day added for Day ${day}. Next day's task shifted.`);
+    };
+
+    const handleRemoveBreakDay = (day: number) => {
+        if (!roadmap || !breakDays.includes(day)) return;
+
+        // Find the index for the break day
+        const idx = roadmap.dailyTasks.findIndex((task: any) => task.day === day && (task.isBreak || task.task === "Break Day"));
+        if (idx === -1) return;
+
+        // Remove break day and shift back only the next task
+        let updatedTasks = roadmap.dailyTasks.filter((task: any, i: number) => i !== idx);
+
+        // Shift back only the next task (if exists and not a break)
+        if (updatedTasks[idx] && updatedTasks[idx].day > 1 && !updatedTasks[idx].isBreak) {
+            updatedTasks[idx].day = updatedTasks[idx].day - 1;
+        }
+
+        // Re-number all days to be sequential and filter out any tasks with empty task strings (not break days)
+        const renumberedTasks = updatedTasks
+            .map((task: any, i: number) => ({ ...task, day: i + 1 }))
+            .filter((task: any) => task.task && (task.task !== "" || task.isBreak));
+
+        setBreakDays(breakDays.filter(d => d !== day));
+        handleRoadmapUpdate({ ...roadmap, dailyTasks: renumberedTasks, days: renumberedTasks.length });
+        toast.info(`Break day removed for Day ${day}. Next day's task shifted back.`);
+    };
+
+    // Delete a day and shift the rest
+    const handleDeleteDay = (day: number) => {
+        if (!roadmap) return;
+        // Remove the day and shift the rest
+        let updatedTasks = roadmap.dailyTasks.filter((task: any) => task.day !== day);
+        // Re-number all days to be sequential
+        updatedTasks = updatedTasks.map((task: any, idx: number) => ({ ...task, day: idx + 1 }));
+        handleRoadmapUpdate({ ...roadmap, dailyTasks: updatedTasks, days: updatedTasks.length });
+        toast.info(`Day ${day} deleted and days shifted.`);
+    };
+
     if (loading || !stats) {
         return (
              <div className="min-h-screen flex items-center justify-center text-2xl font-bold text-primary">
@@ -717,9 +870,9 @@ const Index = () => {
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
-             {timerIsActive && (
+            {timerIsActive && (
                 <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm" />
-             )}
+            )}
             
             <header className="relative z-10 border-b border-primary/20 bg-background/50 backdrop-blur-sm">
                 <div className="absolute inset-0 -z-10 h-full w-full bg-[radial-gradient(hsl(var(--primary)/0.1)_1px,transparent_1px)] [background-size:16px_16px]"></div>
@@ -770,6 +923,10 @@ const Index = () => {
                             onOpenTimer={handleOpenTimer}
                             onSetStartDate={handleSetRoadmapStartDate}
                             onRelocateTask={handleRelocateSubTask}
+                            onMarkBreakDay={handleMarkBreakDay}
+                            onRemoveBreakDay={handleRemoveBreakDay}
+                            breakDays={breakDays}
+                            onDeleteDay={handleDeleteDay} // Pass delete handler
                         />
                         <DashboardStats stats={stats} unlockedAchievements={stats?.unlockedAchievements || []} />
                         <MoodTracker onMoodLog={() => handleStatEvent('mood_logged')} />
@@ -816,6 +973,21 @@ const Index = () => {
                 isSallyOpen={isGuidingOpen}
                 setSallyOpen={setIsGuidingOpen}
             />
+            {/* FIX: Render StudyTimer when activeTimerDetails is set */}
+            {activeTimerDetails && (
+                <StudyTimer
+                    taskText={activeTimerDetails.taskText}
+                    elapsedSeconds={sessionSeconds}
+                    totalLoggedTime={activeTimerDetails.logs.reduce((acc, log) => acc + log.duration, 0)}
+                    isActive={timerIsActive}
+                    setIsActive={setTimerIsActive}
+                    studyLogs={activeTimerDetails.logs}
+                    onSaveSession={handleSaveSession}
+                    onEditLog={handleEditStudyLog}
+                    onDeleteLog={handleDeleteStudyLog}
+                    onClose={handleCloseTimer}
+                />
+            )}
         </div>
     );
 };
