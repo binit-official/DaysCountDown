@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Move } from 'lucide-react';
+import { Clock, Move, Edit2, Trash2, Plus } from 'lucide-react';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
@@ -55,6 +55,9 @@ interface DailyTaskCardProps {
     onMarkBreakDay?: (day: number) => void;
     onRemoveBreakDay?: (day: number) => void;
     onDeleteDay?: (day: number) => void;
+    onEditTask?: (day: number, newTask: string) => void;
+    onDeleteTask?: (day: number, subTaskIndex: number) => void;
+    onAddSubTask?: (day: number, newSubTaskText: string) => void;
     breakDays?: number[];
 }
 
@@ -69,10 +72,16 @@ export const DailyTaskCard: React.FC<DailyTaskCardProps> = ({
     onMarkBreakDay,
     onRemoveBreakDay,
     onDeleteDay,
+    onEditTask,
+    onDeleteTask,
+    onAddSubTask,
     breakDays = [],
 }) => {
     const [newStartDate, setNewStartDate] = React.useState<Date | undefined>();
     const [relocatingTask, setRelocatingTask] = React.useState<{taskIndex: number, destDay: number} | null>(null);
+    const [editingSubTaskIdx, setEditingSubTaskIdx] = React.useState<number | null>(null);
+    const [editingSubTaskText, setEditingSubTaskText] = React.useState("");
+    const [newSubTaskText, setNewSubTaskText] = React.useState("");
 
     const taskForSelectedDay = roadmap?.dailyTasks.find(t => t.day === selectedDay);
     const isRoadmapFuture = roadmap?.startDate && new Date(roadmap.startDate) > new Date();
@@ -154,22 +163,84 @@ export const DailyTaskCard: React.FC<DailyTaskCardProps> = ({
                                 onCheckedChange={() => handleToggleSubTask(index)}
                                 disabled={selectedDay > currentDay && !sub.completed}
                             />
-                            <label
-                                htmlFor={`subtask-${index}`}
-                                className={`flex-grow ${sub.completed ? 'line-through text-muted-foreground' : ''}`}
-                            >
-                                {sub.text}
-                            </label>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onOpenTimer(selectedDay, index, sub.text, sub.studyLogs || [])}>
-                                <Clock className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setRelocatingTask({taskIndex: index, destDay: selectedDay})}>
-                                <Move className="h-4 w-4" />
-                            </Button>
+                            {editingSubTaskIdx === index ? (
+                                <>
+                                    <input
+                                        className="flex-grow px-2 py-1 rounded border"
+                                        value={editingSubTaskText}
+                                        onChange={e => setEditingSubTaskText(e.target.value)}
+                                    />
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => {
+                                            if (onEditTask) onEditTask(selectedDay, editingSubTaskText);
+                                            setEditingSubTaskIdx(null);
+                                        }}
+                                    >
+                                        <Edit2 className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setEditingSubTaskIdx(null)}
+                                    >
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <label
+                                        htmlFor={`subtask-${index}`}
+                                        className={`flex-grow ${sub.completed ? 'line-through text-muted-foreground' : ''}`}
+                                    >
+                                        {sub.text}
+                                    </label>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onOpenTimer(selectedDay, index, sub.text, sub.studyLogs || [])}>
+                                        <Clock className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setRelocatingTask({taskIndex: index, destDay: selectedDay})}>
+                                        <Move className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                        setEditingSubTaskIdx(index);
+                                        setEditingSubTaskText(sub.text);
+                                    }}>
+                                        <Edit2 className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDeleteTask && onDeleteTask(selectedDay, index)}>
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                </>
+                            )}
                         </li>
                     ))}
                 </ul>
-            </div>
+                {/* Add new subtask */}
+                <div className="flex items-center gap-2 mt-2">
+                    <input
+                        className="flex-grow px-2 py-1 rounded border"
+                        value={newSubTaskText}
+                        onChange={e => setNewSubTaskText(e.target.value)}
+                        placeholder="Add new subtask..."
+                    />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                            if (onAddSubTask && newSubTaskText.trim()) {
+                                onAddSubTask(selectedDay, newSubTaskText.trim());
+                                setNewSubTaskText("");
+                            }
+                        }}
+                    >
+                        <Plus className="h-4 w-4 text-green-600" />
+                    </Button>
+                </div>
+              </div>
         );
     };
 

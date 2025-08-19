@@ -10,6 +10,8 @@ import { Roadmap } from '@/components/Roadmap';
 import { Logo } from '@/components/Logo';
 import { UserNav } from '@/components/UserNav';
 import { Card } from '@/components/ui/card';
+// FIX: Import Button for dialog usage
+import { Button } from '@/components/ui/button';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc, getDoc, updateDoc, runTransaction, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { AlertTriangle, Zap, Flame, Target } from 'lucide-react';
@@ -59,6 +61,10 @@ const Index = () => {
 
     // Optimized break day logic: only shift one day, no extra empty/break days
     const [breakDays, setBreakDays] = useState<number[]>([]);
+
+    // Remove the textarea from the main page and show it only in a dialog when replan is triggered
+    const [showReplanDialog, setShowReplanDialog] = useState(false);
+    const [customReplanPrompt, setCustomReplanPrompt] = useState<string>("");
 
     useEffect(() => {
         sessionSecondsRef.current = sessionSeconds;
@@ -701,7 +707,27 @@ const Index = () => {
         setProposedRoadmap({ ...roadmap, dailyTasks: updatedDailyTasks });
     };
 
+    // Modified replan handler: open dialog first
+    const handleReplanClick = () => {
+        setShowReplanDialog(true);
+    };
+
+    // Show RoadmapPreview for confirmation before updating database
+    const handleApproveChanges = () => {
+        if (proposedRoadmap) {
+            handleRoadmapUpdate(proposedRoadmap);
+            toast.success("Your roadmap has been updated!");
+            setProposedRoadmap(null);
+        }
+    };
+
+    const handleCancelChanges = () => {
+        setProposedRoadmap(null);
+    };
+
+    // Actual AI replan logic, called after dialog confirm
     const handleReplanWithAI = async () => {
+        setShowReplanDialog(false);
         if (!roadmap || !user) return;
         setLoading(true);
         toast.info("Asking Nyx to generate a new plan...");
@@ -728,6 +754,9 @@ const Index = () => {
 
             Here is a list of their future planned tasks:
             ${futureTasks.join('\n')}
+
+            Additional customization or instructions from the user:
+            ${customReplanPrompt}
 
             Your task is to create a new, realistic, and optimized roadmap for the remaining ${remainingDays} days.
             This new plan should intelligently combine and reschedule ALL of the incomplete and future tasks.
@@ -759,12 +788,24 @@ const Index = () => {
             }
 
             const data = await response.json();
-            const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            let content = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!content) throw new Error("AI failed to generate a new plan.");
 
-            const cleanedContent = content.replace(/```json\n?|```/g, '').trim();
-            const newDailyTasks = JSON.parse(cleanedContent);
+            // Try to parse the JSON safely
+            let newDailyTasks;
+            try {
+                // Remove any markdown code block wrappers
+                content = content.replace(/```json[\s\S]*?```/g, m => m.replace(/```json|```/g, '').trim());
+                content = content.replace(/```[\s\S]*?```/g, m => m.replace(/```/g, '').trim());
+                content = content.trim();
+                newDailyTasks = JSON.parse(content);
+            } catch (err) {
+                toast.error("AI response could not be parsed. Try again or adjust your instructions.");
+                setLoading(false);
+                return;
+            }
 
+            // Show confirmation dialog before updating database
             const newRoadmap = {
                 ...roadmap,
                 dailyTasks: [
@@ -780,44 +821,21 @@ const Index = () => {
         }
     };
 
-    const handleApproveChanges = () => {
-        if(proposedRoadmap){
-            const updatedRoadmap = JSON.parse(JSON.stringify(proposedRoadmap));
-            updatedRoadmap.dailyTasks.forEach((task: any) => {
-                if (task.day < currentDay && !task.completed) {
-                    task.completed = true;
-                }
-            });
-            handleRoadmapUpdate(updatedRoadmap);
-            toast.success("Your roadmap has been updated!");
-            setProposedRoadmap(null);
-        }
-    };
-
+    // Make sure these handler functions are defined BEFORE the return statement
     const handleMarkBreakDay = (day: number) => {
         if (!roadmap || breakDays.includes(day)) return;
-
-        // Find the index for the break day (day numbers start at 1, array at 0)
+        // ...existing logic for marking break day...
         const idx = roadmap.dailyTasks.findIndex((task: any) => task.day === day);
         if (idx === -1) return;
-
-        // Only insert a break day if the day actually has a task
         if (!roadmap.dailyTasks[idx].task || roadmap.dailyTasks[idx].task === "Break Day") return;
-
-        // Insert break day at idx, shift only the next task
         const updatedTasks = roadmap.dailyTasks.map((task: any) => ({ ...task }));
         updatedTasks.splice(idx, 0, { day, task: "Break Day", difficulty: "Easy", completed: false, isBreak: true });
-
-        // Shift only the next task (if exists)
         if (updatedTasks[idx + 1] && !updatedTasks[idx + 1].isBreak) {
             updatedTasks[idx + 1].day = updatedTasks[idx + 1].day + 1;
         }
-
-        // Re-number all days to be sequential and filter out any tasks with empty task strings (not break days)
         const renumberedTasks = updatedTasks
             .map((task: any, i: number) => ({ ...task, day: i + 1 }))
             .filter((task: any) => task.task && (task.task !== "" || task.isBreak));
-
         setBreakDays([...breakDays, day]);
         handleRoadmapUpdate({ ...roadmap, dailyTasks: renumberedTasks, days: renumberedTasks.length });
         toast.success(`Break day added for Day ${day}. Next day's task shifted.`);
@@ -825,48 +843,88 @@ const Index = () => {
 
     const handleRemoveBreakDay = (day: number) => {
         if (!roadmap || !breakDays.includes(day)) return;
-
-        // Find the index for the break day
         const idx = roadmap.dailyTasks.findIndex((task: any) => task.day === day && (task.isBreak || task.task === "Break Day"));
         if (idx === -1) return;
-
-        // Remove break day and shift back only the next task
         let updatedTasks = roadmap.dailyTasks.filter((task: any, i: number) => i !== idx);
-
-        // Shift back only the next task (if exists and not a break)
         if (updatedTasks[idx] && updatedTasks[idx].day > 1 && !updatedTasks[idx].isBreak) {
             updatedTasks[idx].day = updatedTasks[idx].day - 1;
         }
-
-        // Re-number all days to be sequential and filter out any tasks with empty task strings (not break days)
         const renumberedTasks = updatedTasks
             .map((task: any, i: number) => ({ ...task, day: i + 1 }))
             .filter((task: any) => task.task && (task.task !== "" || task.isBreak));
-
         setBreakDays(breakDays.filter(d => d !== day));
         handleRoadmapUpdate({ ...roadmap, dailyTasks: renumberedTasks, days: renumberedTasks.length });
         toast.info(`Break day removed for Day ${day}. Next day's task shifted back.`);
     };
 
-    // Delete a day and shift the rest
     const handleDeleteDay = (day: number) => {
         if (!roadmap) return;
-        // Remove the day and shift the rest
         let updatedTasks = roadmap.dailyTasks.filter((task: any) => task.day !== day);
-        // Re-number all days to be sequential
         updatedTasks = updatedTasks.map((task: any, idx: number) => ({ ...task, day: idx + 1 }));
         handleRoadmapUpdate({ ...roadmap, dailyTasks: updatedTasks, days: updatedTasks.length });
         toast.info(`Day ${day} deleted and days shifted.`);
     };
 
-    if (loading || !stats) {
-        return (
-             <div className="min-h-screen flex items-center justify-center text-2xl font-bold text-primary">
-                <Zap className="w-8 h-8 mr-4 animate-spin" />
-                Loading Mission Control...
-            </div>
+    const handleEditTask = (day: number, newTask: string) => {
+        if (!roadmap) return;
+        const updatedTasks = roadmap.dailyTasks.map((task: any) =>
+            task.day === day
+                ? {
+                    ...task,
+                    subTasks: (task.subTasks || []).map((sub: any, idx: number) =>
+                        idx === 0 ? { ...sub, text: newTask } : sub
+                    ),
+                    task: newTask
+                }
+                : task
         );
-    }
+        handleRoadmapUpdate({ ...roadmap, dailyTasks: updatedTasks });
+        toast.success(`Task for Day ${day} updated.`);
+    };
+
+    const handleDeleteTask = (day: number, subTaskIndex: number) => {
+        if (!roadmap) return;
+        const updatedTasks = roadmap.dailyTasks.map((task: any) => {
+            if (task.day === day) {
+                let subTasks = task.subTasks || task.task.split(';').map((t: string) => ({
+                    text: t.trim(),
+                    completed: false,
+                    studyLogs: []
+                }));
+                subTasks = subTasks.filter((_, idx) => idx !== subTaskIndex);
+                return {
+                    ...task,
+                    subTasks,
+                    task: subTasks.map((t: any) => t.text).join('; ')
+                };
+            }
+            return task;
+        });
+        handleRoadmapUpdate({ ...roadmap, dailyTasks: updatedTasks });
+        toast.info(`Subtask deleted for Day ${day}.`);
+    };
+
+    const handleAddSubTask = (day: number, newSubTaskText: string) => {
+        if (!roadmap) return;
+        const updatedTasks = roadmap.dailyTasks.map((task: any) => {
+            if (task.day === day) {
+                let subTasks = task.subTasks || task.task.split(';').map((t: string) => ({
+                    text: t.trim(),
+                    completed: false,
+                    studyLogs: []
+                }));
+                subTasks = [...subTasks, { text: newSubTaskText, completed: false, studyLogs: [] }];
+                return {
+                    ...task,
+                    subTasks,
+                    task: subTasks.map((t: any) => t.text).join('; ')
+                };
+            }
+            return task;
+        });
+        handleRoadmapUpdate({ ...roadmap, dailyTasks: updatedTasks });
+        toast.success(`New subtask added for Day ${day}.`);
+    };
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
@@ -926,7 +984,10 @@ const Index = () => {
                             onMarkBreakDay={handleMarkBreakDay}
                             onRemoveBreakDay={handleRemoveBreakDay}
                             breakDays={breakDays}
-                            onDeleteDay={handleDeleteDay} // Pass delete handler
+                            onDeleteDay={handleDeleteDay}
+                            onEditTask={handleEditTask}
+                            onDeleteTask={handleDeleteTask}
+                            onAddSubTask={handleAddSubTask}
                         />
                         <DashboardStats stats={stats} unlockedAchievements={stats?.unlockedAchievements || []} />
                         <MoodTracker onMoodLog={() => handleStatEvent('mood_logged')} />
@@ -961,7 +1022,7 @@ const Index = () => {
                     currentDay={currentDay}
                     stats={stats}
                     onInfuseTasks={handleInfuseTasks}
-                    onReplan={handleReplanWithAI}
+                    onReplan={handleReplanClick}
                 />
             </main>
 
@@ -986,6 +1047,36 @@ const Index = () => {
                     onEditLog={handleEditStudyLog}
                     onDeleteLog={handleDeleteStudyLog}
                     onClose={handleCloseTimer}
+                />
+            )}
+
+            {/* Show dialog for custom prompt when replan is triggered */}
+            {showReplanDialog && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
+                    <div className="bg-card rounded-lg p-6 shadow-xl max-w-lg w-full">
+                        <h2 className="text-xl font-bold mb-2">Customize AI Roadmap Replan</h2>
+                        <p className="mb-2 text-muted-foreground">Add instructions, preferences, or ideas for the AI to use when re-planning your roadmap.</p>
+                        <textarea
+                            className="w-full p-2 rounded border border-primary/30 bg-background/80 mb-4"
+                            value={customReplanPrompt}
+                            onChange={e => setCustomReplanPrompt(e.target.value)}
+                            placeholder="E.g. Focus on weekends, add more review days, etc."
+                            rows={4}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setShowReplanDialog(false)}>Cancel</Button>
+                            <Button onClick={handleReplanWithAI}>Replan with AI</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Show RoadmapPreview for confirmation before updating database */}
+            {proposedRoadmap && (
+                <RoadmapPreview
+                    proposedRoadmap={proposedRoadmap}
+                    onCancel={handleCancelChanges}
+                    onApprove={handleApproveChanges}
+                    currentDay={currentDay}
                 />
             )}
         </div>
